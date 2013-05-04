@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """													"""
 """                    Fakedns.py					"""
 """    A regular-expression based DNS MITM Server	"""
@@ -8,6 +9,7 @@
 
 import socket
 import re
+import sys
 
 class DNSQuery:
   def __init__(self, data):
@@ -69,10 +71,14 @@ class ruleEngine:
             print str(len(rules)) + " rules parsed"
 
 if __name__ == '__main__':
+  if len(sys.argv) < 2:
+    print "Usage:"
+    print "./fakedns.py [configfile]"
+    exit()
   udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   udps.bind(('',53))
   try:
-    rules = ruleEngine('dns.conf')
+    rules = ruleEngine(sys.argv[1])
     re_list = rules.re_list
     while 1:
       data, addr = udps.recvfrom(1024)
