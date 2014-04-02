@@ -86,6 +86,10 @@ if __name__ == '__main__':
   if len(sys.argv) == 2:
     path = sys.argv[1]
 
+  if not os.path.isfile(path):
+    print '>> Please create a "dns.conf" file or specify a config path: ./fakedns.py [configfile]'
+    exit()
+
   udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   udps.bind(('',53))
   try:
