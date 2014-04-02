@@ -43,7 +43,7 @@ class Respuesta:
             except:
                 # That domain doesn't appear to exist, build accordingly
                 print "Unable to parse request"
-                # Build the response packet         
+                # Build the response packet
                 self.packet+=self.data[:2] + "\x81\x83"                         # Reply Code: No Such Name
                 #							0 answer rrs   0 additional, 0 auth
                 self.packet+=self.data[4:6] + '\x00\x00' + '\x00\x00\x00\x00'   # Questions and Answers Counts
