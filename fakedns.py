@@ -10,6 +10,7 @@
 import socket
 import re
 import sys
+import os
 
 class DNSQuery:
   def __init__(self, data):
@@ -63,22 +64,32 @@ class Respuesta:
 class ruleEngine:
     def __init__(self,file):
         self.re_list = []
+        print '>>', 'Parse rules...'
         with open(file,'r') as rulefile:
             rules = rulefile.readlines()
             for rule in rules:
                 splitrule = rule.split()
+
+                # If the ip is 'self' transform it to local ip.
+                if splitrule[1] == 'self':
+                    ip = socket.gethostbyname(socket.gethostname())
+                    splitrule[1] = ip
                 self.re_list.append([re.compile(splitrule[0]),splitrule[1]])
-            print str(len(rules)) + " rules parsed"
+                print '>>', splitrule[0], '->', splitrule[1]
+            print '>>', str(len(rules)) + " rules parsed"
 
 if __name__ == '__main__':
-  if len(sys.argv) < 2:
-    print "Usage:"
-    print "./fakedns.py [configfile]"
-    exit()
+  # Default config file path.
+  path = 'dns.conf'
+
+  # Specify a config path.
+  if len(sys.argv) == 2:
+    path = sys.argv[1]
+
   udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   udps.bind(('',53))
   try:
-    rules = ruleEngine(sys.argv[1])
+    rules = ruleEngine(path)
     re_list = rules.re_list
     while 1:
       data, addr = udps.recvfrom(1024)
