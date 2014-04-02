@@ -35,15 +35,15 @@ class Respuesta:
             result = rule[0].match(query.dominio)
             if result is not None:
                 ip = rule[1]
-                print "Matched Request: " + query.dominio + ":" + ip
+                print ">> Matched Request: " + query.dominio + ":" + ip
         # We didn't find a match, get the real ip
         if ip is None:
             try:
                 ip = socket.gethostbyname(query.dominio)
-                print "Unmatched request: " + query.dominio + ":" + ip
+                print ">> Unmatched request: " + query.dominio + ":" + ip
             except:
                 # That domain doesn't appear to exist, build accordingly
-                print "Unable to parse request"
+                print ">> Unable to parse request"
                 # Build the response packet
                 self.packet+=self.data[:2] + "\x81\x83"                         # Reply Code: No Such Name
                 #							0 answer rrs   0 additional, 0 auth
@@ -74,6 +74,7 @@ class ruleEngine:
                 if splitrule[1] == 'self':
                     ip = socket.gethostbyname(socket.gethostname())
                     splitrule[1] = ip
+
                 self.re_list.append([re.compile(splitrule[0]),splitrule[1]])
                 print '>>', splitrule[0], '->', splitrule[1]
             print '>>', str(len(rules)) + " rules parsed"
