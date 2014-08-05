@@ -6,7 +6,7 @@
 # Adapted from https://github.com/jimmykane/Roque-Dns-Server to follow DNS specs-ish
 # Jimmykane's version was in turn modified from an activestate recipe : http://code.activestate.com/recipes/491264-mini-fake-dns-server/
 # I then modified it to be more efficient, support a config file, regular expression matching, passthrough requests, and proper "not found" responses
-
+import thread
 import socket
 import re
 import sys
@@ -79,6 +79,12 @@ class ruleEngine:
                 print '>>', splitrule[0], '->', splitrule[1]
             print '>>', str(len(rules)) + " rules parsed"
 
+def respond(data,addr):
+  p=DNSQuery(data)
+  response = Respuesta(p,re_list).packet
+  udps.sendto(response, addr)
+
+
 if __name__ == '__main__':
   # Default config file path.
   path = 'dns.conf'
@@ -98,9 +104,7 @@ if __name__ == '__main__':
     re_list = rules.re_list
     while 1:
       data, addr = udps.recvfrom(1024)
-      p=DNSQuery(data)
-      response = Respuesta(p,re_list).packet
-      udps.sendto(response, addr)
+      thread.start_new_thread(respond,(data,addr))
   except KeyboardInterrupt:
     print 'Finalizando'
     udps.close()
