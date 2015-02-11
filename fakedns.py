@@ -26,16 +26,59 @@ class DNSQuery:
         ini+=lon+1
         lon=ord(data[ini])
 
+#because python doesn't have native ENUM in 2.7:
+TYPE = {
+    "A":"\x00\x01",
+    "AAAA":"\x00\x1c",
+    "CNAME":"\x00\x05",
+    "PTR":"\x00\x0c",
+    "TXT":"\x00\x10"
+}
+
+class DNSResponse(object):
+    def __init__(self,query):
+        self.id = query.data[:2]        # Use the ID from the request.
+        self.flags = "\x81\x83"         # No errors, we never have those.
+        self.questions = query.data[4:6]# Number of questions asked...
+        self.rranswers = "\x00\x01"     # Answer RRs (Answer resource records contained in response) 1 for now.
+        self.rrauthority = "\x00\x00"   # Same but for authority
+        self.rradditional = "\x00\x00"  # Same but for additionals.
+        self.query = query.data[12:]    # The original query is contained in the response
+        self.pointer = "\xc0\x0c"       # The pointer to the resource record - seems to always be this value.
+        self.type = None                # This value is set by the subclass and is defined in TYPE dict.
+        self.dnsclass = "\x00\x01"      # "IN" class.
+        self.ttl = "\x00\x00\x00\x01"   # TODO: Make this adjustable - 1 is good for noobs/testers
+        self.length = None              # Set by subclass because is variable except in A/AAAA records.
+        self.data = None                # Same as above.
+
+    def make_packet(self):
+        self.packet = self.id + self.flags + self.questions + self.rranswers + self.rrauthority + self.rradditional + self.query + self.pointer + self.type + self.dnsclass + self.ttl + self.length + self.data
+        return self.packet
+
+class NONEFOUND(DNSResponse(object):
+    def __init__(NONEFOUND,self).__init__()
+        self.rranswers = "\x00\x00"
+
+class TXT(DNSResponse):
+    def __init__(self,txt_record):
+        super(TXT,self).__init__()
+        self.type = TYPE['TXT']
+        self.data = txt_record
+        # Need to pad this with an additional \x00 if the len is not enough
+        self.length = hex(len(txt_record))
+
+
 class Respuesta:
     def __init__(self, query,re_list):
         self.data = query.data
         self.packet=''
         ip = None
         for rule in re_list:
-            result = rule[0].match(query.dominio)
+            result = rule[1].match(query.dominio)
             if result is not None:
-                ip = rule[1]
+                ip = rule[2]
                 print ">> Matched Request: " + query.dominio + ":" + ip
+
         # We didn't find a match, get the real ip
         if ip is None:
             try:
@@ -50,16 +93,17 @@ class Respuesta:
                 self.packet+=self.data[4:6] + '\x00\x00' + '\x00\x00\x00\x00'   # Questions and Answers Counts
                 self.packet+=self.data[12:]                                     # Original Domain Name Question
 
-        # Quick Hack
-        if self.packet == '':
-            # Build the response packet
-            self.data[:2] #transaction ID
-            self.packet+=self.data[:2] + "\x81\x80"
-            self.packet+=self.data[4:6] + self.data[4:6] + '\x00\x00\x00\x00'   # Questions and Answers Counts
-            self.packet+=self.data[12:]                                         # Original Domain Name Question
-            self.packet+='\xc0\x0c'                                             # Pointer to domain name
-            self.packet+='\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04'             # Response type, ttl and resource data length -> 4 bytes
-            self.packet+=str.join('',map(lambda x: chr(int(x)), ip.split('.'))) # 4bytes of IP
+#        # Quick Hack
+#        if self.packet == '':
+#            # Build the response packet
+#            self.data[:2] #transaction ID
+#            self.packet+=self.data[:2] + "\x81\x80"                             # NO ERROR flags
+#            self.packet+=self.data[4:6] + self.data[4:6] + '\x00\x00\x00\x00'   # Questions and Answers Counts
+#            self.packet+=self.data[12:]                                         # Original Domain Name Question
+#            self.packet+='\xc0\x0c'                                             # Pointer to domain name
+#            self.packet+=query.type
+#            self.packet+='\x00\x01\x00\x00\x00\x3c\x00\x04'             # Response type, ttl and resource data length -> 4 bytes
+#            self.packet+=str.join('',map(lambda x: chr(int(x)), ip.split('.'))) # 4bytes of IP
 
 class ruleEngine:
     def __init__(self,file):
@@ -70,13 +114,19 @@ class ruleEngine:
             for rule in rules:
                 splitrule = rule.split()
 
-                # If the ip is 'self' transform it to local ip.
-                if splitrule[1] == 'self':
-                    ip = socket.gethostbyname(socket.gethostname())
-                    splitrule[1] = ip
+                # Make sure that the record type is one we currently support
+                # TODO: Straight-up let a user define a custome response type byte if we don't have one.
+                if splitrule[0] not in TYPE.keys():
+                    print "Malformed rule : " + rule + " Not Processed."
+                    continue
 
-                self.re_list.append([re.compile(splitrule[0]),splitrule[1]])
-                print '>>', splitrule[0], '->', splitrule[1]
+                # If the ip is 'self' transform it to local ip.
+                if splitrule[2] == 'self':
+                    ip = socket.gethostbyname(socket.gethostname())
+                    splitrule[2] = ip
+
+                self.re_list.append([splitrule[0],re.compile(splitrule[1]),splitrule[2]])
+                print '>>', splitrule[1], '->', splitrule[2]
             print '>>', str(len(rules)) + " rules parsed"
 
 def respond(data,addr):
