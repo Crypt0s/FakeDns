@@ -24,10 +24,14 @@ If a match is not made, the DNS server will attempt to resolve the request using
 Supported Request Types
 =======================
     - A
-    - AAAA
-    - CNAME
-    - MX
     - TXT
+
+In-Progress Request Types
+=========================
+    - MX
+    - PTR
+    - CNAME
+    - AAAA
 
 Misc
 ====
