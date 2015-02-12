@@ -165,10 +165,24 @@ class ruleEngine:
                     response = CASE[query.type](query,rule[2])
                     return response.make_packet()
             
+        # OK, we don't have a rule for it, lets see if it exists...
+        try:
+            # We need to handle the request potentially being a TXT,A,MX,ect... request.
+            # So....we make a socket and literally just forward the request raw to our DNS server.
 
-        # The cool thing about this is that NOTFOUND will take the type straight out of
-        # the query object and build the correct query response type from that automagically
-        return NONEFOUND(query).make_packet()
+            response = CASE[query.type](query,rule[2])
+            return response.make_packet()
+        except:
+            # The cool thing about this is that NOTFOUND will take the type straight out of
+            # the query object and build the correct query response type from that automagically
+            return NONEFOUND(query).make_packet()
+
+# Convenience method for threading -- helps implement a DNS proxy
+def passthru():
+    s = socket(AF_INET,SOCK_DGRAM)
+    addr = (host,port)
+    s.sendto(data,addr)
+    data,addr = s.recvfrom(buf)
     
 # Convenience method for threading.
 def respond(data,addr):
