@@ -38,7 +38,7 @@ TYPE = {
 class DNSResponse(object):
     def __init__(self,query):
         self.id = query.data[:2]        # Use the ID from the request.
-        self.flags = "\x81\x83"         # No errors, we never have those.
+        self.flags = "\x81\x80"         # No errors, we never have those.
         self.questions = query.data[4:6]# Number of questions asked...
         self.rranswers = "\x00\x01"     # Answer RRs (Answer resource records contained in response) 1 for now.
         self.rrauthority = "\x00\x00"   # Same but for authority
@@ -52,32 +52,23 @@ class DNSResponse(object):
         self.data = None                # Same as above.
 
     def make_packet(self):
-        self.packet = self.id + self.flags + self.questions + self.rranswers + self.rrauthority + self.rradditional + self.query + self.pointer + self.type + self.dnsclass + self.ttl + self.length + self.data
+        try:
+            self.packet = self.id + self.flags + self.questions + self.rranswers + self.rrauthority + self.rradditional + self.query + self.pointer + self.type + self.dnsclass + self.ttl + self.length + self.data
+        except:
+            pdb.set_trace()
         return self.packet
 
 
 # All classess need to set type, length, and data fields of the DNS Response
 class A(DNSResponse):
-    def __init__(self,query):
+    def __init__(self,query,record):
         super(A,self).__init__(query)
         self.type = "\x00\x01"
         self.length = "\x00\x04"
-        self.data = get_ip(request)
+        self.data = self.get_ip(record,query)
 
-    def get_ip(dns_record):
-        for rule in re_list:
-            result = rule[1].match(query.dominio)
-            if result is not None:
-                ip = rule[2]
-                print ">> Matched Request: " + query.dominio + ":" + ip    
-            else:
-                try:
-                    ip = socket.gethostbyname(query.dominio)
-                    print ">> Unmatched request: " + query.dominio + ":" + ip
-                except:
-                    # The IP lookup has failed -- we should build a NOTFOUND response here.
-                    print "Unmatched Request"
-                    return 1
+    def get_ip(self,dns_record,query):
+        ip = dns_record
         # Convert to hex
         return str.join('',map(lambda x: chr(int(x)), ip.split('.')))
 
@@ -108,8 +99,13 @@ class TXT(DNSResponse):
         super(TXT,self).__init__(query)
         self.type = "\x00\x10"
         self.data = txt_record
-        # Need to pad this with an additional \x00 if the len is not enough
-        self.length = hex(len(txt_record))
+
+        self.length = chr(len(txt_record)+1)
+        # Must be two bytes.
+        if self.length < '\xff':
+            self.length = "\x00"+self.length
+        # Then, we have to add the TXT record length field!  We utilize the length field for this since it is already in the right spot
+        self.length = self.length+chr(len(txt_record))
 
 # And this one is because Python doesn't have Case/Switch
 CASE = {
@@ -125,33 +121,11 @@ class NONEFOUND(DNSResponse):
     def __init__(self,query):
         super(NONEFOUND,self).__init__(query)
         self.type = query.type
+        self.flags = "\x81\x83"
         self.rranswers = "\x00\x00"
         self.length = "\x00\x00"
         self.data = "\x00"
         print ">> Built NONEFOUND response"
-
-class Respuesta:
-    def __init__(self, query,re_list):
-        self.data = query.data
-        self.packet=''
-        ip = None
-
-        for rule in re_list:
-            result = rule[1].match(query.dominio)
-            if result is not None:
-                ip = rule[2]
-                print ">> Matched Request: " + query.dominio + ":" + ip
-
-        # handlers for MX, A, AAAA
-        # We didn't find a match, get the real ip
-        if ip is None:
-            try:
-                ip = socket.gethostbyname(query.dominio)
-                print ">> Unmatched request: " + query.dominio + ":" + ip
-            except:
-                # That domain doesn't appear to exist, build accordingly
-                print ">> Unable to parse request"
-                # Build the response packet
 
 class ruleEngine:
     def __init__(self,file):
@@ -188,12 +162,13 @@ class ruleEngine:
             if rule[1].match(query.dominio):
                 if rule[0] == TYPE[query.type]:
                     # OK, this is a full match, fire away with the correct response type:
-                        response = CASE[query.type](query,rule[2])
-                        return response.make_packet()
+                    response = CASE[query.type](query,rule[2])
+                    return response.make_packet()
+            
 
-            # The cool thing about this is that NOTFOUND will take the type straight out of
-            # the query object and build the correct query response type from that automagically
-            return NONEFOUND(query).make_packet()
+        # The cool thing about this is that NOTFOUND will take the type straight out of
+        # the query object and build the correct query response type from that automagically
+        return NONEFOUND(query).make_packet()
     
 # Convenience method for threading.
 def respond(data,addr):
