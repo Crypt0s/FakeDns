@@ -1,6 +1,4 @@
-A google.* 127.0.0.1
-A yahoo.* 9.9.9.9
-A facebook.* 4.4.4.4
-A localserver.* self
-
-TXT
+TXT google.* 127.0.0.1
+TXT yahoo.* 9.9.9.9
+TXT facebook.* 4.4.4.4
+TXT localserver.* self

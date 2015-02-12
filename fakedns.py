@@ -3,9 +3,7 @@
 """                    Fakedns.py					"""
 """    A regular-expression based DNS MITM Server	"""
 """						by: Crypt0s					"""
-# Adapted from https://github.com/jimmykane/Roque-Dns-Server to follow DNS specs-ish
-# Jimmykane's version was in turn modified from an activestate recipe : http://code.activestate.com/recipes/491264-mini-fake-dns-server/
-# I then modified it to be more efficient, support a config file, regular expression matching, passthrough requests, and proper "not found" responses
+
 import thread
 import socket
 import re
@@ -18,6 +16,8 @@ class DNSQuery:
     self.dominio=''
 
     tipo = (ord(data[2]) >> 3) & 15   # Opcode bits
+    self.type = tipo
+
     if tipo == 0:                     # Standard query
       ini=12
       lon=ord(data[ini])
@@ -26,7 +26,7 @@ class DNSQuery:
         ini+=lon+1
         lon=ord(data[ini])
 
-#because python doesn't have native ENUM in 2.7:
+# Because python doesn't have native ENUM in 2.7:
 TYPE = {
     "A":"\x00\x01",
     "AAAA":"\x00\x1c",
@@ -55,30 +55,89 @@ class DNSResponse(object):
         self.packet = self.id + self.flags + self.questions + self.rranswers + self.rrauthority + self.rradditional + self.query + self.pointer + self.type + self.dnsclass + self.ttl + self.length + self.data
         return self.packet
 
-class NONEFOUND(DNSResponse(object):
-    def __init__(NONEFOUND,self).__init__()
-        self.rranswers = "\x00\x00"
+class A(DNSResponse):
+    def __init__(self,query):
+        super(A,self).__init__(query)
+        self.type = "\x00\x01"
+        self.length = "\x00\x04"
+        self.data = get_ip(request)
+
+    def get_ip(dns_record):
+        for rule in re_list:
+            result = rule[1].match(query.dominio)
+            if result is not None:
+                ip = rule[2]
+                print ">> Matched Request: " + query.dominio + ":" + ip    
+            else:
+                try:
+                    ip = socket.gethostbyname(query.dominio)
+                    print ">> Unmatched request: " + query.dominio + ":" + ip
+                except:
+                    # The IP lookup has failed -- we should build a NOTFOUND response here.
+                    print "Unmatched Request"
+                    return 1
+        # Convert to hex
+        return str.join('',map(lambda x: chr(int(x)), ip.split('.')))
+
+class AAAA(DNSResponse):
+    def __init__(self,query):
+        super(AAAA,self).__init__(query)
+        self.type = "\x00\x1c"
+
+    # Thanks, stackexchange! http://stackoverflow.com/questions/16276913/reliably-get-ipv6-address-in-python
+    def get_ip_6(host, port=0):
+        # search only for the wanted v6 addresses
+        result = socket.getaddrinfo(host, port, socket.AF_INET6)
+        # Will need something that looks like this: 
+        #map(lambda x: chr(int(x)), ip.split('.'))
+        return result[0][4][0] # just returns the first answer and only the address
+
+class CNAME(DNSResponse):
+    def __init__(self,query):
+        super(CNAME,self).__init__(query)
+        self.type = "\x00\x05"
+
+class PTR(DNSResponse):
+    def __init__(self,query):
+        super(PTR,self).__init__(query)
 
 class TXT(DNSResponse):
-    def __init__(self,txt_record):
-        super(TXT,self).__init__()
+    def __init__(self,txt_record,query):
+        super(TXT,self).__init__(query)
         self.type = TYPE['TXT']
         self.data = txt_record
         # Need to pad this with an additional \x00 if the len is not enough
         self.length = hex(len(txt_record))
 
+# And this one is because Python doesn't have Case/Switch
+CASE = {
+    "A":A,
+    "AAAA":AAAA,
+    "CNAME":CNAME,
+    "PTR":PTR,
+    "TXT":TXT
+}
+
+# Technically this is a subclass of A
+class NONEFOUND(DNSResponse):
+    def __init__(self,query):
+        super(NONEFOUND,self).__init__(query)
+        self.type = query.type
+        self.rranswers = "\x00\x00"
 
 class Respuesta:
     def __init__(self, query,re_list):
         self.data = query.data
         self.packet=''
         ip = None
+
         for rule in re_list:
             result = rule[1].match(query.dominio)
             if result is not None:
                 ip = rule[2]
                 print ">> Matched Request: " + query.dominio + ":" + ip
 
+        # handlers for MX, A, AAAA
         # We didn't find a match, get the real ip
         if ip is None:
             try:
@@ -88,22 +147,6 @@ class Respuesta:
                 # That domain doesn't appear to exist, build accordingly
                 print ">> Unable to parse request"
                 # Build the response packet
-                self.packet+=self.data[:2] + "\x81\x83"                         # Reply Code: No Such Name
-                #							0 answer rrs   0 additional, 0 auth
-                self.packet+=self.data[4:6] + '\x00\x00' + '\x00\x00\x00\x00'   # Questions and Answers Counts
-                self.packet+=self.data[12:]                                     # Original Domain Name Question
-
-#        # Quick Hack
-#        if self.packet == '':
-#            # Build the response packet
-#            self.data[:2] #transaction ID
-#            self.packet+=self.data[:2] + "\x81\x80"                             # NO ERROR flags
-#            self.packet+=self.data[4:6] + self.data[4:6] + '\x00\x00\x00\x00'   # Questions and Answers Counts
-#            self.packet+=self.data[12:]                                         # Original Domain Name Question
-#            self.packet+='\xc0\x0c'                                             # Pointer to domain name
-#            self.packet+=query.type
-#            self.packet+='\x00\x01\x00\x00\x00\x3c\x00\x04'             # Response type, ttl and resource data length -> 4 bytes
-#            self.packet+=str.join('',map(lambda x: chr(int(x)), ip.split('.'))) # 4bytes of IP
 
 class ruleEngine:
     def __init__(self,file):
@@ -129,10 +172,27 @@ class ruleEngine:
                 print '>>', splitrule[1], '->', splitrule[2]
             print '>>', str(len(rules)) + " rules parsed"
 
+    # Matching has now been moved into the ruleEngine so that we don't repeat ourselves
+    def match(self,query):
+        for rule in self.re_list:
+            # Match on the domain, then on the query type
+            if rule[1].match(query.dominio):
+                if rule[0] == rulequery.type:
+                    # OK, this is a full match, fire away with the correct response type:
+                        response = CASE[query.type](query,rule[2])
+                        return response.make_packet()
+
+            # The cool thing about this is that NOTFOUND will take the type straight out of
+            # the query object and build the correct query response type from that automagically
+            return NONEFOUND(query).make_packet()
+    
+# Convenience method for threading.
 def respond(data,addr):
-  p=DNSQuery(data)
-  response = Respuesta(p,re_list).packet
-  udps.sendto(response, addr)
+    p=DNSQuery(data)
+    response = rules.match(p)
+    #response = Respuesta(p,re_list).packet
+    udps.sendto(response, addr)
+    return 0
 
 
 if __name__ == '__main__':
@@ -153,6 +213,7 @@ if __name__ == '__main__':
     rules = ruleEngine(path)
     re_list = rules.re_list
     while 1:
+      # I can see this getting messy if we recieve big requests
       data, addr = udps.recvfrom(1024)
       thread.start_new_thread(respond,(data,addr))
   except KeyboardInterrupt:
