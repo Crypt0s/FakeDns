@@ -60,6 +60,7 @@ class DNSResponse(object):
 
 
 # All classess need to set type, length, and data fields of the DNS Response
+# Finished
 class A(DNSResponse):
     def __init__(self,query,record):
         super(A,self).__init__(query)
@@ -72,6 +73,7 @@ class A(DNSResponse):
         # Convert to hex
         return str.join('',map(lambda x: chr(int(x)), ip.split('.')))
 
+# Not implemented, need to get ipv6 to translate correctly into hex
 class AAAA(DNSResponse):
     def __init__(self,query):
         super(AAAA,self).__init__(query)
@@ -82,18 +84,21 @@ class AAAA(DNSResponse):
         # search only for the wanted v6 addresses
         result = socket.getaddrinfo(host, port, socket.AF_INET6)
         # Will need something that looks like this: 
-        #map(lambda x: chr(int(x)), ip.split('.'))
-        return result[0][4][0] # just returns the first answer and only the address
+        ip = result[0][4][0] # just returns the first answer and only the address
+        #return map(lambda x: chr(int(x)), ip.split(':'))
 
+# Not yet implemented
 class CNAME(DNSResponse):
     def __init__(self,query):
         super(CNAME,self).__init__(query)
         self.type = "\x00\x05"
 
+# Not yet implemented
 class PTR(DNSResponse):
     def __init__(self,query):
         super(PTR,self).__init__(query)
 
+# Finished
 class TXT(DNSResponse):
     def __init__(self,query,txt_record):
         super(TXT,self).__init__(query)
@@ -169,21 +174,19 @@ class ruleEngine:
         try:
             # We need to handle the request potentially being a TXT,A,MX,ect... request.
             # So....we make a socket and literally just forward the request raw to our DNS server.
-
-            response = CASE[query.type](query,rule[2])
-            return response.make_packet()
+            s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            addr = ('8.8.8.8',53)
+            s.sendto(query.data,addr)
+            data,addr = s.recvfrom(1024)
+            print "Unmatched Request " + query.dominio
+            return data
         except:
+            # We really shouldn't end up here, but if we do, we want to handle it gracefully and not let down the client.
             # The cool thing about this is that NOTFOUND will take the type straight out of
             # the query object and build the correct query response type from that automagically
+            print ">> Error was handled by sending NONEFOUND"
             return NONEFOUND(query).make_packet()
 
-# Convenience method for threading -- helps implement a DNS proxy
-def passthru():
-    s = socket(AF_INET,SOCK_DGRAM)
-    addr = (host,port)
-    s.sendto(data,addr)
-    data,addr = s.recvfrom(buf)
-    
 # Convenience method for threading.
 def respond(data,addr):
     p=DNSQuery(data)
