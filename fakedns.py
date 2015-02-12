@@ -4,6 +4,7 @@
 """    A regular-expression based DNS MITM Server	"""
 """						by: Crypt0s					"""
 
+import pdb
 import thread
 import socket
 import re
@@ -14,9 +15,8 @@ class DNSQuery:
   def __init__(self, data):
     self.data=data
     self.dominio=''
-
     tipo = (ord(data[2]) >> 3) & 15   # Opcode bits
-    self.type = tipo
+    self.type = data[-4:-2]           # Hackish -- this is where the type bits live -- 2 away from the last 4 bytes of the request.
 
     if tipo == 0:                     # Standard query
       ini=12
@@ -28,11 +28,11 @@ class DNSQuery:
 
 # Because python doesn't have native ENUM in 2.7:
 TYPE = {
-    "A":"\x00\x01",
-    "AAAA":"\x00\x1c",
-    "CNAME":"\x00\x05",
-    "PTR":"\x00\x0c",
-    "TXT":"\x00\x10"
+    "\x00\x01":"A",
+    "\x00\x1c":"AAAA",
+    "\x00\x05":"CNAME",
+    "\x00\x0c":"PTR",
+    "\x00\x10":"TXT"
 }
 
 class DNSResponse(object):
@@ -55,6 +55,8 @@ class DNSResponse(object):
         self.packet = self.id + self.flags + self.questions + self.rranswers + self.rrauthority + self.rradditional + self.query + self.pointer + self.type + self.dnsclass + self.ttl + self.length + self.data
         return self.packet
 
+
+# All classess need to set type, length, and data fields of the DNS Response
 class A(DNSResponse):
     def __init__(self,query):
         super(A,self).__init__(query)
@@ -102,20 +104,20 @@ class PTR(DNSResponse):
         super(PTR,self).__init__(query)
 
 class TXT(DNSResponse):
-    def __init__(self,txt_record,query):
+    def __init__(self,query,txt_record):
         super(TXT,self).__init__(query)
-        self.type = TYPE['TXT']
+        self.type = "\x00\x10"
         self.data = txt_record
         # Need to pad this with an additional \x00 if the len is not enough
         self.length = hex(len(txt_record))
 
 # And this one is because Python doesn't have Case/Switch
 CASE = {
-    "A":A,
-    "AAAA":AAAA,
-    "CNAME":CNAME,
-    "PTR":PTR,
-    "TXT":TXT
+    "\x00\x01": A,
+    "\x00\x1c": AAAA,
+    "\x00\x05": CNAME,
+    "\x00\x0c": PTR,
+    "\x00\x10": TXT
 }
 
 # Technically this is a subclass of A
@@ -124,6 +126,9 @@ class NONEFOUND(DNSResponse):
         super(NONEFOUND,self).__init__(query)
         self.type = query.type
         self.rranswers = "\x00\x00"
+        self.length = "\x00\x00"
+        self.data = "\x00"
+        print ">> Built NONEFOUND response"
 
 class Respuesta:
     def __init__(self, query,re_list):
@@ -159,13 +164,17 @@ class ruleEngine:
 
                 # Make sure that the record type is one we currently support
                 # TODO: Straight-up let a user define a custome response type byte if we don't have one.
-                if splitrule[0] not in TYPE.keys():
+                if splitrule[0] not in TYPE.values():
                     print "Malformed rule : " + rule + " Not Processed."
                     continue
 
                 # If the ip is 'self' transform it to local ip.
                 if splitrule[2] == 'self':
-                    ip = socket.gethostbyname(socket.gethostname())
+                    try:
+                        ip = socket.gethostbyname(socket.gethostname())
+                    except:
+                        print ">> Could not get your IP address from your DNS Server."
+                        ip = '127.0.0.1'
                     splitrule[2] = ip
 
                 self.re_list.append([splitrule[0],re.compile(splitrule[1]),splitrule[2]])
@@ -177,7 +186,7 @@ class ruleEngine:
         for rule in self.re_list:
             # Match on the domain, then on the query type
             if rule[1].match(query.dominio):
-                if rule[0] == rulequery.type:
+                if rule[0] == TYPE[query.type]:
                     # OK, this is a full match, fire away with the correct response type:
                         response = CASE[query.type](query,rule[2])
                         return response.make_packet()
@@ -194,7 +203,6 @@ def respond(data,addr):
     udps.sendto(response, addr)
     return 0
 
-
 if __name__ == '__main__':
   # Default config file path.
   path = 'dns.conf'
@@ -202,11 +210,9 @@ if __name__ == '__main__':
   # Specify a config path.
   if len(sys.argv) == 2:
     path = sys.argv[1]
-
   if not os.path.isfile(path):
     print '>> Please create a "dns.conf" file or specify a config path: ./fakedns.py [configfile]'
     exit()
-
   udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
   udps.bind(('',53))
   try:
