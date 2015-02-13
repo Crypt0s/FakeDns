@@ -1,7 +1,3 @@
-TXT google.* HELLO
-TXT yahoo.* YAHOOOOOOOOOO
-TXT facebook.* FACEPALM
-TXT localserver.* THISSERVER
-A google.* 8.8.8.8
-A yahoo.* 1.1.1.1
-AAAA google.* 1:::
+A .*reddit.* 8.8.8.8
+PTR .*8\.8\.8\..* 2-8-8-8.lolcatz.com
+AAAA lulz.com 2607:f8b0:4006:807::100e
