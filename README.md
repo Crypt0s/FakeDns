@@ -24,13 +24,13 @@ Supported Request Types
 =======================
     - A
     - TXT
+    - AAAA
 
 In-Progress Request Types
 =========================
     - MX
     - PTR
     - CNAME
-    - AAAA
 
 Misc
 ====
