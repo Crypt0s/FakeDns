@@ -32,7 +32,8 @@ TYPE = {
     "\x00\x1c":"AAAA",
     "\x00\x05":"CNAME",
     "\x00\x0c":"PTR",
-    "\x00\x10":"TXT"
+    "\x00\x10":"TXT",
+    "\x00\x0f":"MX"
 }
 
 # Stolen: https://github.com/learningequality/ka-lite/blob/master/python-packages/django/utils/ipv6.py#L209
@@ -161,6 +162,7 @@ class PTR(DNSResponse):
         ptr_entry = "\x07".join(ptr_split)
 
         self.data = "\x0e" + ptr_entry + "\x00"
+        self.data = "\x132-8-8-8\x02lulz\x07com\x00"
         self.length = chr(len(ptr_entry)+2)
         # Again, must be 2-byte value.
         if self.length < '\xff':
@@ -247,7 +249,7 @@ class ruleEngine:
         for rule in self.re_list:
             # Match on the domain, then on the query type
             if rule[1].match(query.dominio):
-                if rule[0] == TYPE[query.type]:
+                if query.type in TYPE.keys() and rule[0] == TYPE[query.type]:
                     # OK, this is a full match, fire away with the correct response type:
                     response = CASE[query.type](query,rule[2])
                     return response.make_packet()
