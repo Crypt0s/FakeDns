@@ -296,7 +296,7 @@ def respond(data,addr,s):
 	return response
 
 def signal_handler(signal, frame):
-    print 'You pressed Ctrl+C!'
+    print 'Exiting...'
     sys.exit(0)
 
 if __name__ == '__main__':
