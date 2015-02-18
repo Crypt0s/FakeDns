@@ -5,12 +5,32 @@
 """						by: Crypt0s					"""
 
 import pdb
-import thread
+import threading
+import time
 import socket
 import re
 import sys
 import os
+import SocketServer
 
+# inspired from DNSChef
+class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
+
+    def __init__(self, server_address, RequestHandlerClass):
+        self.address_family = socket.AF_INET
+        SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass) 
+		
+class UDPHandler(SocketServer.BaseRequestHandler):
+    
+    def handle(self):
+      (data,s) = self.request
+      dnsreply = respond(data,self.client_address)
+	
+      s.sendto(dnsreply, self.client_address) 
+      reply = s.recv(1024)
+ 
+
+		
 class DNSQuery:
   def __init__(self, data):
     self.data=data
@@ -252,16 +272,20 @@ class ruleEngine:
                 if query.type in TYPE.keys() and rule[0] == TYPE[query.type]:
                     # OK, this is a full match, fire away with the correct response type:
                     response = CASE[query.type](query,rule[2])
+                    print ">> Matched Request - " + query.dominio
                     return response.make_packet()
+					
             
         # OK, we don't have a rule for it, lets see if it exists...
         try:
             # We need to handle the request potentially being a TXT,A,MX,ect... request.
             # So....we make a socket and literally just forward the request raw to our DNS server.
             s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+            s.settimeout(3.0)
             addr = ('8.8.8.8',53)
             s.sendto(query.data,addr)
-            data,addr = s.recvfrom(1024)
+            data = s.recv(1024)
+            s.close()
             print "Unmatched Request " + query.dominio
             return data
         except:
@@ -275,9 +299,13 @@ class ruleEngine:
 def respond(data,addr):
     p=DNSQuery(data)
     response = rules.match(p)
-    #response = Respuesta(p,re_list).packet
-    udps.sendto(response, addr)
-    return 0
+    return response
+
+
+
+	
+	
+	
 
 if __name__ == '__main__':
   # Default config file path.
@@ -289,15 +317,24 @@ if __name__ == '__main__':
   if not os.path.isfile(path):
     print '>> Please create a "dns.conf" file or specify a config path: ./fakedns.py [configfile]'
     exit()
-  udps = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  udps.bind(('',53))
+
+  interface = "127.0.0.1"
+  port = 53
+  
+  server = ThreadedUDPServer((interface, int(port)), UDPHandler)
+  rules = ruleEngine(path)
+  re_list = rules.re_list
+  
+  server_thread = threading.Thread(target=server.serve_forever) 
+   
+ 
+  # Exit the server thread when the main thread terminates 
+  server_thread.daemon = True 
+  server_thread.start() 
+   
+  # Loop in the main thread 
   try:
-    rules = ruleEngine(path)
-    re_list = rules.re_list
-    while 1:
-      # I can see this getting messy if we recieve big requests
-      data, addr = udps.recvfrom(1024)
-      thread.start_new_thread(respond,(data,addr))
-  except KeyboardInterrupt:
-    print 'Finalizando'
-    udps.close()
+	while True: time.sleep(100) 
+  except KeyboardInterrupt():
+    server_thread.end()
+    exit
