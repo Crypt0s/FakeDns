@@ -12,6 +12,7 @@ import re
 import sys
 import os
 import SocketServer
+import signal
 
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
@@ -21,16 +22,10 @@ class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
         SocketServer.UDPServer.__init__(self,server_address,RequestHandlerClass) 
 		
 class UDPHandler(SocketServer.BaseRequestHandler):
-    
     def handle(self):
-      (data,s) = self.request
-      dnsreply = respond(data,self.client_address)
-	
-      s.sendto(dnsreply, self.client_address) 
-      reply = s.recv(1024)
- 
+		(data,s) = self.request
+		respond(data,self.client_address,s)
 
-		
 class DNSQuery:
   def __init__(self, data):
     self.data=data
@@ -112,7 +107,6 @@ def _explode_shorthand_ip_string(ip_str):
         ret_ip.append(('0' * (4 - len(hextet)) + hextet).lower())
     return ':'.join(ret_ip)
 
-
 class DNSResponse(object):
     def __init__(self,query):
         self.id = query.data[:2]        # Use the ID from the request.
@@ -135,7 +129,6 @@ class DNSResponse(object):
         except:
             pdb.set_trace()
         return self.packet
-
 
 # All classess need to set type, length, and data fields of the DNS Response
 # Finished
@@ -296,11 +289,15 @@ class ruleEngine:
             return NONEFOUND(query).make_packet()
 
 # Convenience method for threading.
-def respond(data,addr):
-    p=DNSQuery(data)
-    response = rules.match(p)
-    return response
+def respond(data,addr,s):
+	p=DNSQuery(data)
+	response = rules.match(p)
+	s.sendto(response, addr) 
+	return response
 
+def signal_handler(signal, frame):
+    print 'You pressed Ctrl+C!'
+    sys.exit(0)
 
 if __name__ == '__main__':
   # Default config file path.
@@ -313,22 +310,20 @@ if __name__ == '__main__':
     print '>> Please create a "dns.conf" file or specify a config path: ./fakedns.py [configfile]'
     exit()
 
-  interface = "127.0.0.1"
-  port = 53
-  
-  server = ThreadedUDPServer((interface, int(port)), UDPHandler)
   rules = ruleEngine(path)
   re_list = rules.re_list
-  
-  server_thread = threading.Thread(target=server.serve_forever) 
-   
  
-  # Exit the server thread when the main thread terminates 
-  server_thread.daemon = True 
-  server_thread.start() 
-   
-  # Loop in the main thread 
+  interface = "127.0.0.1"
+  port = 53
+ 
   try:
-	while True: time.sleep(100) 
-  except KeyboardInterrupt:
-    exit()
+    server = ThreadedUDPServer((interface, int(port)), UDPHandler)
+    #server_thread = threading.Thread(target=server.serve_forever) 
+  except:
+    print ">> Could not start server -- is another program on udp:53?"
+    exit(1)
+ 
+  server.daemon = True
+  signal.signal(signal.SIGINT, signal_handler)
+  server.serve_forever()  
+  server_thread.join()
