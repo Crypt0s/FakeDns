@@ -302,11 +302,6 @@ def respond(data,addr):
     return response
 
 
-
-	
-	
-	
-
 if __name__ == '__main__':
   # Default config file path.
   path = 'dns.conf'
@@ -335,6 +330,5 @@ if __name__ == '__main__':
   # Loop in the main thread 
   try:
 	while True: time.sleep(100) 
-  except KeyboardInterrupt():
-    server_thread.end()
-    exit
+  except KeyboardInterrupt:
+    exit()
