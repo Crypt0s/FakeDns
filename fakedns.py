@@ -13,6 +13,7 @@ import sys
 import os
 import SocketServer
 import signal
+import argparse
 
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
@@ -38,7 +39,7 @@ class DNSQuery:
       lon=ord(data[ini])
       while lon != 0:
         self.dominio+=data[ini+1:ini+lon+1]+'.'
-        ini+=lon+1
+        ini+=lon+1 #you can implement CNAME and PTR
         lon=ord(data[ini])
 
 # Because python doesn't have native ENUM in 2.7:
@@ -216,6 +217,10 @@ class NONEFOUND(DNSResponse):
 
 class ruleEngine:
     def __init__(self,file):
+
+        # Hackish place to track our DNS rebinding
+        self.match_history = {}
+
         self.re_list = []
         print '>>', 'Parse rules...'
         with open(file,'r') as rulefile:
@@ -247,7 +252,8 @@ class ruleEngine:
                         ip = '127.0.0.1'
                     splitrule[2] = ip
 
-                self.re_list.append([splitrule[0],re.compile(splitrule[1]),splitrule[2]])
+                # things after the third element will be dnsrebind args
+                self.re_list.append([splitrule[0],re.compile(splitrule[1])]+splitrule[2:])
                 
                 # TODO: More robust logging system - printing ipv6 rules requires specialness since I encode the ipv6 addr in-rule
                 if splitrule[0] == "AAAA":
@@ -258,16 +264,27 @@ class ruleEngine:
             print '>>', str(len(rules)) + " rules parsed"
 
     # Matching has now been moved into the ruleEngine so that we don't repeat ourselves
-    def match(self,query):
+    def match(self,query,addr):
         for rule in self.re_list:
             # Match on the domain, then on the query type
             if rule[1].match(query.dominio):
                 if query.type in TYPE.keys() and rule[0] == TYPE[query.type]:
                     # OK, this is a full match, fire away with the correct response type:
-                    response = CASE[query.type](query,rule[2])
+
+                    # Check our DNS Rebinding tracker and see if we need to respond with the second address now...
+                    if args.rebind == True and len(rule) >=3 and addr in self.match_history.keys():
+                        # use second address (rule[3])
+                        response_data = rule[3]
+                        self.match_history[addr] += 1
+                    elif args.rebind == True and len(rule) >= 3:
+                        self.match_history[addr] = 1
+                        response_data = rule[2]
+                    else:
+                        response_data = rule[2]
+                    
+                    response = CASE[query.type](query,response_data)
                     print ">> Matched Request - " + query.dominio
                     return response.make_packet()
-					
             
         # OK, we don't have a rule for it, lets see if it exists...
         try:
@@ -291,7 +308,7 @@ class ruleEngine:
 # Convenience method for threading.
 def respond(data,addr,s):
 	p=DNSQuery(data)
-	response = rules.match(p)
+	response = rules.match(p,addr[0])
 	s.sendto(response, addr) 
 	return response
 
@@ -300,12 +317,16 @@ def signal_handler(signal, frame):
     sys.exit(0)
 
 if __name__ == '__main__':
-  # Default config file path.
-  path = 'dns.conf'
 
-  # Specify a config path.
-  if len(sys.argv) == 2:
-    path = sys.argv[1]
+  parser = argparse.ArgumentParser(description='things and stuff')
+  parser.add_argument('-c', dest='path', action='store', help='Path to configuration file', required=True)
+  parser.add_argument('-i', dest='iface', action='store', help='IP address you wish to run FakeDns with - default all', default='0.0.0.0', required=False)
+  parser.add_argument('--rebind', dest='rebind', action='store_true', required=False, default=False, help="Enable DNS rebinding attacks - responds with one result the first request, and another result on subsequent requests")
+
+  args = parser.parse_args()
+
+  # Default config file path.
+  path = args.path
   if not os.path.isfile(path):
     print '>> Please create a "dns.conf" file or specify a config path: ./fakedns.py [configfile]'
     exit()
@@ -313,12 +334,11 @@ if __name__ == '__main__':
   rules = ruleEngine(path)
   re_list = rules.re_list
  
-  interface = "127.0.0.1"
+  interface = args.iface
   port = 53
- 
+
   try:
     server = ThreadedUDPServer((interface, int(port)), UDPHandler)
-    #server_thread = threading.Thread(target=server.serve_forever) 
   except:
     print ">> Could not start server -- is another program on udp:53?"
     exit(1)
