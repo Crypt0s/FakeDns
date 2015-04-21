@@ -32,8 +32,6 @@ class DNSQuery:
     self.data=data
     self.dominio=''
     tipo = (ord(data[2]) >> 3) & 15   # Opcode bits
-    self.type = data[-4:-2]           # Hackish -- this is where the type bits live -- 2 away from the last 4 bytes of the request.
-
     if tipo == 0:                     # Standard query
       ini=12
       lon=ord(data[ini])
@@ -41,6 +39,9 @@ class DNSQuery:
         self.dominio+=data[ini+1:ini+lon+1]+'.'
         ini+=lon+1 #you can implement CNAME and PTR
         lon=ord(data[ini])
+      self.type = datt[ini:][1:3]
+    else:
+      self.type = data[-4:-2]
 
 # Because python doesn't have native ENUM in 2.7:
 TYPE = {
