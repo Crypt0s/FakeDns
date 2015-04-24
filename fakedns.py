@@ -39,7 +39,7 @@ class DNSQuery:
         self.dominio+=data[ini+1:ini+lon+1]+'.'
         ini+=lon+1 #you can implement CNAME and PTR
         lon=ord(data[ini])
-      self.type = datt[ini:][1:3]
+      self.type = data[ini:][1:3]
     else:
       self.type = data[-4:-2]
 
