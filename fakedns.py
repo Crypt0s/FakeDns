@@ -109,6 +109,24 @@ def _explode_shorthand_ip_string(ip_str):
         ret_ip.append(('0' * (4 - len(hextet)) + hextet).lower())
     return ':'.join(ret_ip)
 
+def _get_question_section(query):
+    # Query format is as follows: 12 byte header, question section (comprised
+    # of arbitrary-length name, 2 byte type, 2 byte class), followed by an
+    # additional section sometimes. (e.g. OPT record for DNSSEC)
+    start_idx = 12
+    end_idx = start_idx
+
+    num_questions = (ord(query.data[4]) << 8) | ord(query.data[5])
+
+    while num_questions > 0:
+        while query.data[end_idx] != '\0':
+            end_idx += ord(query.data[end_idx]) + 1
+        # Include the null byte, type, and class
+        end_idx += 5
+        num_questions -= 1
+
+    return query.data[start_idx:end_idx]
+
 class DNSResponse(object):
     def __init__(self,query):
         self.id = query.data[:2]        # Use the ID from the request.
@@ -117,7 +135,7 @@ class DNSResponse(object):
         self.rranswers = "\x00\x01"     # Answer RRs (Answer resource records contained in response) 1 for now.
         self.rrauthority = "\x00\x00"   # Same but for authority
         self.rradditional = "\x00\x00"  # Same but for additionals.
-        self.query = query.data[12:]    # The original query is contained in the response
+        self.query = _get_question_section(query) # Include the question section
         self.pointer = "\xc0\x0c"       # The pointer to the resource record - seems to always be this value.
         self.type = None                # This value is set by the subclass and is defined in TYPE dict.
         self.dnsclass = "\x00\x01"      # "IN" class.
