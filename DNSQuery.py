@@ -30,40 +30,34 @@ class DNSQuery:
         if not kwargs.has_key('query'):
             raise(BadQuery)
         else:
-            self.query = self._make_request(kwargs['query'])
+            self._make_request(kwargs['query'])
 
         self.type = "\x00\x01" if not kwargs.has_key("type") else kwargs["type"]                        # A record
         self.dns_class = "\x00\x01" if not kwargs.has_key("dns_class") else kwargs["dns_class"]         # IN Class...like I am not.
 
         # OK Build me a packet now.
-        self.packet = self._build_packet()
+        self._build_packet()
 
     # supports special-char domain name requests...
-    def _make_request(data):
-        self.request = ""
+    def _make_request(self, data):
+        request = ""
         for part in data.encode('idna').split('.'): # idna encoding is (apparently) the best, handles non-specials well.
-            self.request += chr(len(part))
-            self.request += part
-        self.request += "\x00"                      # Add the "root" entry of null chr
+            request += chr(len(part))
+            request += part
+        request += "\x00"                      # Add the "root" entry of null chr
+        self.query = request
 
-    def build_packet(self):
-        self.packet = self.transact_id +
-                        self.flags +
-                        self.questions +
-                        self.answer_rrs +
-                        self.auth_rrs +
-                        self.add_rrs +
-                        self.query +
-                        self.type +
-                        self.dns_class
+    def _build_packet(self):
+        self.packet = self.transact_id + self.flags + self.questions + self.answer_rrs + self.auth_rrs + self.add_rrs + self.query + self.type + self.dns_class
 
 if __name__ == "__main__":
     import socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((8.8.8.8, 53))
+    s.connect(('8.8.8.8', 53))
 
     myquery = DNSQuery(query="google.com").packet
 
+    pdb.set_trace()
     sent = s.send(myquery)
 
     print "Bytes Launched Into CyberSpace: " + str(sent)
