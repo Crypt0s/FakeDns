@@ -17,9 +17,10 @@ class DNSQuery:
     class BadQuery(Exception):
         pass
 
+
     def __init__(self, **kwargs):
         # Let you shoot yourself in the foot but babysit enough where you won't be dysfunctional...
-        self.transact_id = os.urandom(4) if not kwargs.has_key("transact_id") else kwargs["transact_id"]# note that this should be crypto-random because reasons
+        self.transact_id = os.urandom(2) if not kwargs.has_key("transact_id") else kwargs["transact_id"]# note that this should be crypto-random because reasons
         self.flags = "\x01\x00" if not kwargs.has_key("flags") else kwargs["flags"]                     # Normal Query
         self.questions = "\x00\x01" if not kwargs.has_key("questions") else kwargs["questions"]
         self.answer_rrs = "\x00\x00" if not kwargs.has_key("answer_rrs") else kwargs["answer_rrs"]
@@ -51,17 +52,23 @@ class DNSQuery:
         self.packet = self.transact_id + self.flags + self.questions + self.answer_rrs + self.auth_rrs + self.add_rrs + self.query + self.type + self.dns_class
 
 if __name__ == "__main__":
+    """
+    Important Note:
+
+    http://serverfault.com/questions/404840/when-do-dns-queries-use-tcp-instead-of-udp
+    DNS goes over TCP when the size of the request or the response is greater than a single packet...
+    The maximum size was originally 512 bytes but there is an extension to the DNS protocol that allows clients to indicate that they can handle UDP responses of up to 4096 bytes.
+    """
     import socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect(('8.8.8.8', 53))
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)#SOCK_STREAM)
+    #s.connect(('8.8.8.8', 53))
 
+    # TODO: Some logic that determines if we need TCP for this request.
     myquery = DNSQuery(query="google.com").packet
-
-    pdb.set_trace()
-    sent = s.send(myquery)
+    sent = s.sendto(myquery,('8.8.8.8', 53))
 
     print "Bytes Launched Into CyberSpace: " + str(sent)
     response = s.recv(512)
     s.close()
 
-    print "Got:" + response
+    print "Got: " + str(len(response)) + " Bytes back."
