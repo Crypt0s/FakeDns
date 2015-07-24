@@ -17,6 +17,47 @@ class DNSQuery:
     class BadQuery(Exception):
         pass
 
+    # Handle making a DNSQuery out of a raw request for various reasons
+    @staticmethod
+    def parse(raw_query):
+        def readrecord(recordsection):
+            recordsection = buffer(recordsection)
+            section_length = None
+            placeholder = 0
+            domain_name = ''
+
+            while section_length != 0:     # 00 is the length of the 'root' label
+                section_length = ord(recordsection[placeholder])
+                label = recordsection[placeholder+1:placeholder+section_length+1] # Python list splicing - add one to the end.
+                placeholder = placeholder + section_length+1
+                if domain_name != '' and ord(recordsection[placeholder]) != "\x00":
+                    domain_name += '.' + label
+                else:
+                    domain_name += label
+
+            # ok we found the end of the last label -- we can parse the next 4 bytes as type and class
+            type = recordsection[placeholder:placeholder+2]
+            dns_class = recordsection[placeholder+2:placeholder+4]
+            return (domain_name,type,dns_class)
+
+        # until I know better about the resource records, I will assume that the query starts on byte 13
+        # TODO: Error handling
+        (domain_name,type,dns_class) = readrecord(raw_query[12:])
+
+        dns_kwargs = {
+            'transact_id' : raw_query[0:2], # Easy 2-byte values
+            'flags' : raw_query[2:4],       # ''
+            'questions' : raw_query[4:6],   # ''
+            'answer_rrs' : raw_query[6:8],  # Gets a little more complicated here
+            'auth_rrs' : raw_query[8:10],   # I dont have to handle this right now
+            'add_rrs' : raw_query[10:12],   #
+            'dns_class' : dns_class,
+            'type' : type,
+            'query' : domain_name,          # That I have to do this is dumb but...
+            'domain_name': domain_name
+        }
+        # TODO: Error handling
+        return DNSQuery(**dns_kwargs)
 
     def __init__(self, **kwargs):
         # Let you shoot yourself in the foot but babysit enough where you won't be dysfunctional...
@@ -26,6 +67,10 @@ class DNSQuery:
         self.answer_rrs = "\x00\x00" if not kwargs.has_key("answer_rrs") else kwargs["answer_rrs"]
         self.auth_rrs = "\x00\x00" if not kwargs.has_key("auth_rrs") else kwargs["auth_rrs"]            # things
         self.add_rrs = "\x00\x00" if not kwargs.has_key("add_rrs") else kwargs["add_rrs"]
+
+        # optional override -- there's a better kwargs-to-attr pattern i will come back and implement later
+        if kwargs.has_key('domain_name'):
+            self.domain_name = kwargs['domain_name']
 
         # This is the one thing you HAVE to provide
         if not kwargs.has_key('query'):
@@ -51,6 +96,10 @@ class DNSQuery:
     def _build_packet(self):
         self.packet = self.transact_id + self.flags + self.questions + self.answer_rrs + self.auth_rrs + self.add_rrs + self.query + self.type + self.dns_class
 
+    # TODO: Pretty Pretty Printing!
+    def __str__(self):
+        pass
+
 if __name__ == "__main__":
     """
     Important Note:
@@ -65,6 +114,10 @@ if __name__ == "__main__":
 
     # TODO: Some logic that determines if we need TCP for this request.
     myquery = DNSQuery(query="google.com").packet
+
+    pdb.set_trace()
+    DNSQuery.parse(myquery)
+
     sent = s.sendto(myquery,('8.8.8.8', 53))
 
     print "Bytes Launched Into CyberSpace: " + str(sent)
