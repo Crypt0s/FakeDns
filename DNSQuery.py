@@ -1,7 +1,6 @@
 #!/usr/bin/python
 import pdb
 import os
-from fakedns import TYPE
 
 """
 Makes massive DNS requests in order to exfil dox, bruh.
@@ -11,6 +10,15 @@ Transact ID     Flags   Questions   Answer RR   Authority RR's  Additional RRs  
    00 00        01 00     00 01       00 00         00 00           00 00        00    --     00    --           00   00 00   00 01 (in)
              (std query)
 """
+
+TYPE = {
+    "\x00\x01": "A",
+    "\x00\x1c": "AAAA",
+    "\x00\x05": "CNAME",
+    "\x00\x0c": "PTR",
+    "\x00\x10": "TXT",
+    "\x00\x0f": "MX"
+}
 
 class DNSQuery:
 
@@ -57,7 +65,9 @@ class DNSQuery:
             'domain_name': domain_name
         }
         # TODO: Error handling
-        return DNSQuery(**dns_kwargs)
+        query = DNSQuery(**dns_kwargs)
+        query.data = raw_query # don't throw away the raw query, it's useful to us.
+        return query
 
     def __init__(self, **kwargs):
         # Let you shoot yourself in the foot but babysit enough where you won't be dysfunctional...
@@ -115,7 +125,6 @@ if __name__ == "__main__":
     # TODO: Some logic that determines if we need TCP for this request.
     myquery = DNSQuery(query="google.com").packet
 
-    pdb.set_trace()
     DNSQuery.parse(myquery)
 
     sent = s.sendto(myquery,('8.8.8.8', 53))
