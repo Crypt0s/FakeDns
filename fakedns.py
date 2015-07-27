@@ -208,7 +208,7 @@ class ruleEngine:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.settimeout(3.0)
             addr = ('8.8.8.8', 53)
-            s.sendto(query._, addr)
+            s.sendto(query.data, addr)
             data = s.recv(1024)
             s.close()
             print "Unmatched Request " + query.domain_name
