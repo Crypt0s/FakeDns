@@ -35,8 +35,8 @@ class DNSQuery:
     def __init__(self, data):
         self.data = data
         self.dominio = ''
-        tipo = (ord(data[2]) >> 3) & 15   # Opcode bits
-        if tipo == 0:                     # Standard query
+        tipo = (ord(data[2]) >> 3) & 15  # Opcode bits
+        if tipo == 0:  # Standard query
             ini = 12
             lon = ord(data[ini])
             while lon != 0:
@@ -141,12 +141,12 @@ def _get_question_section(query):
 class DNSResponse(object):
 
     def __init__(self, query):
-        self.id = query.data[:2]        # Use the ID from the request.
-        self.flags = "\x81\x80"         # No errors, we never have those.
+        self.id = query.data[:2]  # Use the ID from the request.
+        self.flags = "\x81\x80"  # No errors, we never have those.
         self.questions = query.data[4:6]  # Number of questions asked...
         # Answer RRs (Answer resource records contained in response) 1 for now.
         self.rranswers = "\x00\x01"
-        self.rrauthority = "\x00\x00"   # Same but for authority
+        self.rrauthority = "\x00\x00"  # Same but for authority
         self.rradditional = "\x00\x00"  # Same but for additionals.
         # Include the question section
         self.query = _get_question_section(query)
@@ -154,12 +154,12 @@ class DNSResponse(object):
         self.pointer = "\xc0\x0c"
         # This value is set by the subclass and is defined in TYPE dict.
         self.type = None
-        self.dnsclass = "\x00\x01"      # "IN" class.
+        self.dnsclass = "\x00\x01"  # "IN" class.
         # TODO: Make this adjustable - 1 is good for noobs/testers
         self.ttl = "\x00\x00\x00\x01"
         # Set by subclass because is variable except in A/AAAA records.
         self.length = None
-        self.data = None                # Same as above.
+        self.data = None  # Same as above.
 
     def make_packet(self):
         try:
