@@ -364,7 +364,7 @@ class ruleEngine:
             # We need to handle the request potentially being a TXT,A,MX,ect... request.
             # So....we make a socket and literally just forward the request raw
             # to our DNS server.
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s = socket.socket(type=socket.SOCK_DGRAM)
             s.settimeout(3.0)
             addr = ('8.8.8.8', 53)
             s.sendto(query.data, addr)
