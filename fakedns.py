@@ -231,7 +231,6 @@ class PTR(DNSResponse):
         ptr_entry = "\x07".join(ptr_split)
 
         self.data = "\x0e" + ptr_entry + "\x00"
-        self.data = "\x132-8-8-8\x02lulz\x07com\x00"
         self.length = chr(len(ptr_entry) + 2)
         # Again, must be 2-byte value.
         if self.length < '\xff':
