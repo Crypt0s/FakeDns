@@ -180,9 +180,9 @@ class A(DNSResponse):
         super(A, self).__init__(query)
         self.type = "\x00\x01"
         self.length = "\x00\x04"
-        self.data = self.get_ip(record, query)
+        self.data = self.get_ip(record)
 
-    def get_ip(self, dns_record, query):
+    def get_ip(self, dns_record):
         ip = dns_record
         # Convert to hex
         return str.join('', map(lambda x: chr(int(x)), ip.split('.')))
