@@ -171,7 +171,7 @@ class DNSResponse(object):
             pdb.set_trace()
         return self.packet
 
-# All classess need to set type, length, and data fields of the DNS Response
+# All classes need to set type, length, and data fields of the DNS Response
 # Finished
 
 
