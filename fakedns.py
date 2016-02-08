@@ -251,7 +251,7 @@ class TXT(DNSResponse):
             self.length = "\x00" + self.length
         # Then, we have to add the TXT record length field!  We utilize the
         # length field for this since it is already in the right spot
-        self.length = self.length + chr(len(txt_record))
+        self.length += chr(len(txt_record))
 
 # And this one is because Python doesn't have Case/Switch
 CASE = {
