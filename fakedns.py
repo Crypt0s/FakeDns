@@ -266,14 +266,14 @@ class NONEFOUND(DNSResponse):
 
 
 class ruleEngine:
-    def __init__(self, file):
+    def __init__(self, file_):
 
         # Hackish place to track our DNS rebinding
         self.match_history = {}
 
         self.re_list = []
         print '>>', 'Parse rules...'
-        with open(file, 'r') as rulefile:
+        with open(file_, 'r') as rulefile:
             rules = rulefile.readlines()
             for rule in rules:
                 splitrule = rule.split()
