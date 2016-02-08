@@ -178,7 +178,7 @@ class A(DNSResponse):
     def get_ip(self, dns_record):
         ip = dns_record
         # Convert to hex
-        return str.join('', map(lambda x: chr(int(x)), ip.split('.')))
+        return ''.join(map(lambda x: chr(int(x)), ip.split('.')))
 
 # Not implemented, need to get ipv6 to translate correctly into hex
 
