@@ -265,7 +265,7 @@ class NONEFOUND(DNSResponse):
         print ">> Built NONEFOUND response"
 
 
-class ruleEngine:
+class RuleEngine:
     def __init__(self, file_):
 
         # Hackish place to track our DNS rebinding
@@ -322,7 +322,7 @@ class ruleEngine:
 
             print '>>', str(len(rules)), "rules parsed"
 
-    # Matching has now been moved into the ruleEngine so that we don't repeat
+    # Matching has now been moved into the RuleEngine so that we don't repeat
     # ourselves
     def match(self, query, addr):
         for rule in self.re_list:
@@ -409,7 +409,7 @@ if __name__ == '__main__':
               './fakedns.py [configfile]'
         exit()
 
-    rules = ruleEngine(path)
+    rules = RuleEngine(path)
     re_list = rules.re_list
 
     interface = args.iface
