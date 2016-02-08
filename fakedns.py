@@ -17,10 +17,10 @@ import argparse
 
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
-    def __init__(self, server_address, RequestHandlerClass):
+    def __init__(self, server_address, request_handler):
         self.address_family = socket.AF_INET
         SocketServer.UDPServer.__init__(
-            self, server_address, RequestHandlerClass)
+            self, server_address, request_handler)
 
 
 class UDPHandler(SocketServer.BaseRequestHandler):
