@@ -2,8 +2,6 @@
 """Fakedns.py: A regular-expression based DNS MITM Server by Crypt0s."""
 
 import pdb
-import threading
-import time
 import socket
 import re
 import sys
