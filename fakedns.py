@@ -164,12 +164,12 @@ class DNSResponse(object):
 
     def make_packet(self):
         try:
-            self.packet = self.id + self.flags + self.questions + self.rranswers + self.rrauthority + \
-                self.rradditional + self.query + self.pointer + self.type + \
-                self.dnsclass + self.ttl + self.length + self.data
+            return self.id + self.flags + self.questions + self.rranswers + \
+                self.rrauthority + self.rradditional + self.query + \
+                self.pointer + self.type + self.dnsclass + self.ttl + \
+                self.length + self.data
         except (TypeError, ValueError):
             pdb.set_trace()
-        return self.packet
 
 # All classes need to set type, length, and data fields of the DNS Response
 # Finished
