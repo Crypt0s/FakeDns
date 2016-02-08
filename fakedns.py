@@ -14,7 +14,6 @@ import argparse
 
 
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
-
     def __init__(self, server_address, request_handler):
         self.address_family = socket.AF_INET
         SocketServer.UDPServer.__init__(
@@ -22,14 +21,12 @@ class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
 
 
 class UDPHandler(SocketServer.BaseRequestHandler):
-
     def handle(self):
         (data, s) = self.request
         respond(data, self.client_address, s)
 
 
 class DNSQuery:
-
     def __init__(self, data):
         self.data = data
         self.dominio = ''
@@ -137,7 +134,6 @@ def _get_question_section(query):
 
 
 class DNSResponse(object):
-
     def __init__(self, query):
         self.id = query.data[:2]  # Use the ID from the request.
         self.flags = "\x81\x80"  # No errors, we never have those.
@@ -173,7 +169,6 @@ class DNSResponse(object):
 
 
 class A(DNSResponse):
-
     def __init__(self, query, record):
         super(A, self).__init__(query)
         self.type = "\x00\x01"
@@ -189,7 +184,6 @@ class A(DNSResponse):
 
 
 class AAAA(DNSResponse):
-
     def __init__(self, query, address):
         super(AAAA, self).__init__(query)
         self.type = "\x00\x1c"
@@ -210,7 +204,6 @@ class AAAA(DNSResponse):
 
 
 class CNAME(DNSResponse):
-
     def __init__(self, query):
         super(CNAME, self).__init__(query)
         self.type = "\x00\x05"
@@ -219,7 +212,6 @@ class CNAME(DNSResponse):
 
 
 class PTR(DNSResponse):
-
     def __init__(self, query, ptr_entry):
         super(PTR, self).__init__(query)
         self.type = "\x00\x0c"
@@ -237,7 +229,6 @@ class PTR(DNSResponse):
 
 
 class TXT(DNSResponse):
-
     def __init__(self, query, txt_record):
         super(TXT, self).__init__(query)
         self.type = "\x00\x10"
@@ -263,7 +254,6 @@ CASE = {
 
 
 class NONEFOUND(DNSResponse):
-
     def __init__(self, query):
         super(NONEFOUND, self).__init__(query)
         self.type = query.type
@@ -275,7 +265,6 @@ class NONEFOUND(DNSResponse):
 
 
 class ruleEngine:
-
     def __init__(self, file):
 
         # Hackish place to track our DNS rebinding
