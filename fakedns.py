@@ -167,7 +167,7 @@ class DNSResponse(object):
             self.packet = self.id + self.flags + self.questions + self.rranswers + self.rrauthority + \
                 self.rradditional + self.query + self.pointer + self.type + \
                 self.dnsclass + self.ttl + self.length + self.data
-        except:
+        except (TypeError, ValueError):
             pdb.set_trace()
         return self.packet
 
@@ -315,7 +315,7 @@ class ruleEngine:
                 if splitrule[2] == 'self':
                     try:
                         ip = socket.gethostbyname(socket.gethostname())
-                    except:
+                    except socket.error:
                         print ">> Could not get your IP address from your DNS Server."
                         ip = '127.0.0.1'
                     splitrule[2] = ip
@@ -372,7 +372,7 @@ class ruleEngine:
             s.close()
             print "Unmatched Request " + query.dominio
             return data
-        except:
+        except socket.error:
             # We really shouldn't end up here, but if we do, we want to handle it gracefully and not let down the client.
             # The cool thing about this is that NOTFOUND will take the type straight out of
             # the query object and build the correct query response type from
@@ -420,7 +420,7 @@ if __name__ == '__main__':
 
     try:
         server = ThreadedUDPServer((interface, int(port)), UDPHandler)
-    except:
+    except socket.error:
         print ">> Could not start server -- is another program on udp:53?"
         exit(1)
 
