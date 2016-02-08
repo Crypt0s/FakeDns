@@ -175,7 +175,8 @@ class A(DNSResponse):
         self.length = "\x00\x04"
         self.data = self.get_ip(record)
 
-    def get_ip(self, dns_record):
+    @staticmethod
+    def get_ip(dns_record):
         ip = dns_record
         # Convert to hex
         return ''.join(chr(int(x)) for x in ip.split('.'))
