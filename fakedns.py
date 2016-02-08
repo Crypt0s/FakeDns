@@ -295,7 +295,7 @@ class ruleEngine:
                 # TODO: Straight-up let a user define a custome response type
                 # byte if we don't have one.
                 if splitrule[0] not in TYPE.values():
-                    print "Malformed rule : " + rule + " Not Processed."
+                    print "Malformed rule :", rule, "Not Processed."
                     continue
 
                 # We need to do some housekeeping for ipv6 rules and turn them into full addresses if they are shorts.
@@ -331,7 +331,7 @@ class ruleEngine:
                 else:
                     print '>>', splitrule[1], '->', splitrule[2]
 
-            print '>>', str(len(rules)) + " rules parsed"
+            print '>>', str(len(rules)), "rules parsed"
 
     # Matching has now been moved into the ruleEngine so that we don't repeat
     # ourselves
