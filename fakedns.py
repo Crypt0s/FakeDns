@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 """Fakedns.py: A regular-expression based DNS MITM Server by Crypt0s."""
 
 import pdb
