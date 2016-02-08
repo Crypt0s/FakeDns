@@ -346,12 +346,12 @@ class ruleEngine:
 
                     # Check our DNS Rebinding tracker and see if we need to
                     # respond with the second address now...
-                    if args.rebind == True and len(rule) >= 3 and \
+                    if args.rebind and len(rule) >= 3 and \
                             addr in self.match_history.keys():
                         # use second address (rule[3])
                         response_data = rule[3]
                         self.match_history[addr] += 1
-                    elif args.rebind == True and len(rule) >= 3:
+                    elif args.rebind and len(rule) >= 3:
                         self.match_history[addr] = 1
                         response_data = rule[2]
                     else:
