@@ -298,7 +298,8 @@ class ruleEngine:
                     print "Malformed rule :", rule, "Not Processed."
                     continue
 
-                # We need to do some housekeeping for ipv6 rules and turn them into full addresses if they are shorts.
+                # We need to do some housekeeping for ipv6 rules and turn
+                # them into full addresses if they are shorts.
                 # I could do this at match-time, but i like speed, so I've
                 # decided to keep this in the rule parser and then work on the
                 # logging separate
@@ -316,7 +317,8 @@ class ruleEngine:
                     try:
                         ip = socket.gethostbyname(socket.gethostname())
                     except socket.error:
-                        print ">> Could not get your IP address from your DNS Server."
+                        print ">> Could not get your IP address from your " \
+                              "DNS Server."
                         ip = '127.0.0.1'
                     splitrule[2] = ip
 
@@ -345,7 +347,8 @@ class ruleEngine:
 
                     # Check our DNS Rebinding tracker and see if we need to
                     # respond with the second address now...
-                    if args.rebind == True and len(rule) >= 3 and addr in self.match_history.keys():
+                    if args.rebind == True and len(rule) >= 3 and \
+                            addr in self.match_history.keys():
                         # use second address (rule[3])
                         response_data = rule[3]
                         self.match_history[addr] += 1
@@ -361,7 +364,8 @@ class ruleEngine:
 
         # OK, we don't have a rule for it, lets see if it exists...
         try:
-            # We need to handle the request potentially being a TXT,A,MX,ect... request.
+            # We need to handle the request potentially being a TXT,A,MX,
+            # ect... request.
             # So....we make a socket and literally just forward the request raw
             # to our DNS server.
             s = socket.socket(type=socket.SOCK_DGRAM)
@@ -373,10 +377,11 @@ class ruleEngine:
             print "Unmatched Request " + query.dominio
             return data
         except socket.error:
-            # We really shouldn't end up here, but if we do, we want to handle it gracefully and not let down the client.
-            # The cool thing about this is that NOTFOUND will take the type straight out of
-            # the query object and build the correct query response type from
-            # that automagically
+            # We really shouldn't end up here, but if we do, we want to handle
+            # it gracefully and not let down the client. The cool thing about
+            # this is that NOTFOUND will take the type straight out of the query
+            # object and build the correct query response type from that
+            # automagically.
             print ">> Error was handled by sending NONEFOUND"
             return NONEFOUND(query).make_packet()
 
@@ -397,19 +402,24 @@ def signal_handler(signal, frame):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='things and stuff')
-    parser.add_argument('-c', dest='path', action='store',
-                        help='Path to configuration file', required=True)
-    parser.add_argument('-i', dest='iface', action='store',
-                        help='IP address you wish to run FakeDns with - default all', default='0.0.0.0', required=False)
-    parser.add_argument('--rebind', dest='rebind', action='store_true', required=False, default=False,
-                        help="Enable DNS rebinding attacks - responds with one result the first request, and another result on subsequent requests")
+    parser.add_argument(
+        '-c', dest='path', action='store', required=True,
+        help='Path to configuration file')
+    parser.add_argument(
+        '-i', dest='iface', action='store', default='0.0.0.0', required=False,
+        help='IP address you wish to run FakeDns with - default all')
+    parser.add_argument(
+        '--rebind', dest='rebind', action='store_true', required=False,
+        default=False, help="Enable DNS rebinding attacks - responds with one "
+        "result the first request, and another result on subsequent requests")
 
     args = parser.parse_args()
 
     # Default config file path.
     path = args.path
     if not os.path.isfile(path):
-        print '>> Please create a "dns.conf" file or specify a config path: ./fakedns.py [configfile]'
+        print '>> Please create a "dns.conf" file or specify a config path: ' \
+              './fakedns.py [configfile]'
         exit()
 
     rules = ruleEngine(path)
