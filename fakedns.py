@@ -1,12 +1,7 @@
-#!/usr/bin/python
-"""													"""
-"""                    Fakedns.py					"""
-"""    A regular-expression based DNS MITM Server	"""
-"""						by: Crypt0s					"""
+#!/usr/bin/env python
+"""Fakedns.py: A regular-expression based DNS MITM Server by Crypt0s."""
 
 import pdb
-import threading
-import time
 import socket
 import re
 import sys
@@ -19,27 +14,24 @@ import argparse
 
 
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
-
-    def __init__(self, server_address, RequestHandlerClass):
+    def __init__(self, server_address, request_handler):
         self.address_family = socket.AF_INET
         SocketServer.UDPServer.__init__(
-            self, server_address, RequestHandlerClass)
+            self, server_address, request_handler)
 
 
 class UDPHandler(SocketServer.BaseRequestHandler):
-
     def handle(self):
         (data, s) = self.request
         respond(data, self.client_address, s)
 
 
 class DNSQuery:
-
     def __init__(self, data):
         self.data = data
         self.dominio = ''
-        tipo = (ord(data[2]) >> 3) & 15   # Opcode bits
-        if tipo == 0:                     # Standard query
+        tipo = (ord(data[2]) >> 3) & 15  # Opcode bits
+        if tipo == 0:  # Standard query
             ini = 12
             lon = ord(data[ini])
             while lon != 0:
@@ -93,7 +85,6 @@ def _explode_shorthand_ip_string(ip_str):
         # We've already got a longhand ip_str.
         return ip_str
 
-    new_ip = []
     hextet = ip_str.split('::')
 
     # If there is a ::, we need to expand it with zeroes
@@ -143,14 +134,13 @@ def _get_question_section(query):
 
 
 class DNSResponse(object):
-
     def __init__(self, query):
-        self.id = query.data[:2]        # Use the ID from the request.
-        self.flags = "\x81\x80"         # No errors, we never have those.
+        self.id = query.data[:2]  # Use the ID from the request.
+        self.flags = "\x81\x80"  # No errors, we never have those.
         self.questions = query.data[4:6]  # Number of questions asked...
         # Answer RRs (Answer resource records contained in response) 1 for now.
         self.rranswers = "\x00\x01"
-        self.rrauthority = "\x00\x00"   # Same but for authority
+        self.rrauthority = "\x00\x00"  # Same but for authority
         self.rradditional = "\x00\x00"  # Same but for additionals.
         # Include the question section
         self.query = _get_question_section(query)
@@ -158,44 +148,43 @@ class DNSResponse(object):
         self.pointer = "\xc0\x0c"
         # This value is set by the subclass and is defined in TYPE dict.
         self.type = None
-        self.dnsclass = "\x00\x01"      # "IN" class.
+        self.dnsclass = "\x00\x01"  # "IN" class.
         # TODO: Make this adjustable - 1 is good for noobs/testers
         self.ttl = "\x00\x00\x00\x01"
         # Set by subclass because is variable except in A/AAAA records.
         self.length = None
-        self.data = None                # Same as above.
+        self.data = None  # Same as above.
 
     def make_packet(self):
         try:
-            self.packet = self.id + self.flags + self.questions + self.rranswers + self.rrauthority + \
-                self.rradditional + self.query + self.pointer + self.type + \
-                self.dnsclass + self.ttl + self.length + self.data
-        except:
+            return self.id + self.flags + self.questions + self.rranswers + \
+                self.rrauthority + self.rradditional + self.query + \
+                self.pointer + self.type + self.dnsclass + self.ttl + \
+                self.length + self.data
+        except (TypeError, ValueError):
             pdb.set_trace()
-        return self.packet
 
-# All classess need to set type, length, and data fields of the DNS Response
+# All classes need to set type, length, and data fields of the DNS Response
 # Finished
 
 
 class A(DNSResponse):
-
     def __init__(self, query, record):
         super(A, self).__init__(query)
         self.type = "\x00\x01"
         self.length = "\x00\x04"
-        self.data = self.get_ip(record, query)
+        self.data = self.get_ip(record)
 
-    def get_ip(self, dns_record, query):
+    @staticmethod
+    def get_ip(dns_record):
         ip = dns_record
         # Convert to hex
-        return str.join('', map(lambda x: chr(int(x)), ip.split('.')))
+        return ''.join(chr(int(x)) for x in ip.split('.'))
 
 # Not implemented, need to get ipv6 to translate correctly into hex
 
 
 class AAAA(DNSResponse):
-
     def __init__(self, query, address):
         super(AAAA, self).__init__(query)
         self.type = "\x00\x1c"
@@ -216,7 +205,6 @@ class AAAA(DNSResponse):
 
 
 class CNAME(DNSResponse):
-
     def __init__(self, query):
         super(CNAME, self).__init__(query)
         self.type = "\x00\x05"
@@ -225,7 +213,6 @@ class CNAME(DNSResponse):
 
 
 class PTR(DNSResponse):
-
     def __init__(self, query, ptr_entry):
         super(PTR, self).__init__(query)
         self.type = "\x00\x0c"
@@ -234,7 +221,6 @@ class PTR(DNSResponse):
         ptr_entry = "\x07".join(ptr_split)
 
         self.data = "\x0e" + ptr_entry + "\x00"
-        self.data = "\x132-8-8-8\x02lulz\x07com\x00"
         self.length = chr(len(ptr_entry) + 2)
         # Again, must be 2-byte value.
         if self.length < '\xff':
@@ -244,7 +230,6 @@ class PTR(DNSResponse):
 
 
 class TXT(DNSResponse):
-
     def __init__(self, query, txt_record):
         super(TXT, self).__init__(query)
         self.type = "\x00\x10"
@@ -255,7 +240,7 @@ class TXT(DNSResponse):
             self.length = "\x00" + self.length
         # Then, we have to add the TXT record length field!  We utilize the
         # length field for this since it is already in the right spot
-        self.length = self.length + chr(len(txt_record))
+        self.length += chr(len(txt_record))
 
 # And this one is because Python doesn't have Case/Switch
 CASE = {
@@ -270,7 +255,6 @@ CASE = {
 
 
 class NONEFOUND(DNSResponse):
-
     def __init__(self, query):
         super(NONEFOUND, self).__init__(query)
         self.type = query.type
@@ -281,16 +265,15 @@ class NONEFOUND(DNSResponse):
         print ">> Built NONEFOUND response"
 
 
-class ruleEngine:
-
-    def __init__(self, file):
+class RuleEngine:
+    def __init__(self, file_):
 
         # Hackish place to track our DNS rebinding
         self.match_history = {}
 
         self.re_list = []
         print '>>', 'Parse rules...'
-        with open(file, 'r') as rulefile:
+        with open(file_, 'r') as rulefile:
             rules = rulefile.readlines()
             for rule in rules:
                 splitrule = rule.split()
@@ -299,10 +282,11 @@ class ruleEngine:
                 # TODO: Straight-up let a user define a custome response type
                 # byte if we don't have one.
                 if splitrule[0] not in TYPE.values():
-                    print "Malformed rule : " + rule + " Not Processed."
+                    print "Malformed rule :", rule, "Not Processed."
                     continue
 
-                # We need to do some housekeeping for ipv6 rules and turn them into full addresses if they are shorts.
+                # We need to do some housekeeping for ipv6 rules and turn
+                # them into full addresses if they are shorts.
                 # I could do this at match-time, but i like speed, so I've
                 # decided to keep this in the rule parser and then work on the
                 # logging separate
@@ -319,8 +303,9 @@ class ruleEngine:
                 if splitrule[2] == 'self':
                     try:
                         ip = socket.gethostbyname(socket.gethostname())
-                    except:
-                        print ">> Could not get your IP address from your DNS Server."
+                    except socket.error:
+                        print ">> Could not get your IP address from your " \
+                              "DNS Server."
                         ip = '127.0.0.1'
                     splitrule[2] = ip
 
@@ -335,9 +320,9 @@ class ruleEngine:
                 else:
                     print '>>', splitrule[1], '->', splitrule[2]
 
-            print '>>', str(len(rules)) + " rules parsed"
+            print '>>', str(len(rules)), "rules parsed"
 
-    # Matching has now been moved into the ruleEngine so that we don't repeat
+    # Matching has now been moved into the RuleEngine so that we don't repeat
     # ourselves
     def match(self, query, addr):
         for rule in self.re_list:
@@ -349,11 +334,12 @@ class ruleEngine:
 
                     # Check our DNS Rebinding tracker and see if we need to
                     # respond with the second address now...
-                    if args.rebind == True and len(rule) >= 3 and addr in self.match_history.keys():
+                    if args.rebind and len(rule) >= 3 and \
+                            addr in self.match_history.keys():
                         # use second address (rule[3])
                         response_data = rule[3]
                         self.match_history[addr] += 1
-                    elif args.rebind == True and len(rule) >= 3:
+                    elif args.rebind and len(rule) >= 3:
                         self.match_history[addr] = 1
                         response_data = rule[2]
                     else:
@@ -365,10 +351,11 @@ class ruleEngine:
 
         # OK, we don't have a rule for it, lets see if it exists...
         try:
-            # We need to handle the request potentially being a TXT,A,MX,ect... request.
+            # We need to handle the request potentially being a TXT,A,MX,
+            # ect... request.
             # So....we make a socket and literally just forward the request raw
             # to our DNS server.
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s = socket.socket(type=socket.SOCK_DGRAM)
             s.settimeout(3.0)
             addr = ('8.8.8.8', 53)
             s.sendto(query.data, addr)
@@ -376,11 +363,12 @@ class ruleEngine:
             s.close()
             print "Unmatched Request " + query.dominio
             return data
-        except:
-            # We really shouldn't end up here, but if we do, we want to handle it gracefully and not let down the client.
-            # The cool thing about this is that NOTFOUND will take the type straight out of
-            # the query object and build the correct query response type from
-            # that automagically
+        except socket.error:
+            # We really shouldn't end up here, but if we do, we want to handle
+            # it gracefully and not let down the client. The cool thing about
+            # this is that NOTFOUND will take the type straight out of the query
+            # object and build the correct query response type from that
+            # automagically.
             print ">> Error was handled by sending NONEFOUND"
             return NONEFOUND(query).make_packet()
 
@@ -401,22 +389,27 @@ def signal_handler(signal, frame):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='things and stuff')
-    parser.add_argument('-c', dest='path', action='store',
-                        help='Path to configuration file', required=True)
-    parser.add_argument('-i', dest='iface', action='store',
-                        help='IP address you wish to run FakeDns with - default all', default='0.0.0.0', required=False)
-    parser.add_argument('--rebind', dest='rebind', action='store_true', required=False, default=False,
-                        help="Enable DNS rebinding attacks - responds with one result the first request, and another result on subsequent requests")
+    parser.add_argument(
+        '-c', dest='path', action='store', required=True,
+        help='Path to configuration file')
+    parser.add_argument(
+        '-i', dest='iface', action='store', default='0.0.0.0', required=False,
+        help='IP address you wish to run FakeDns with - default all')
+    parser.add_argument(
+        '--rebind', dest='rebind', action='store_true', required=False,
+        default=False, help="Enable DNS rebinding attacks - responds with one "
+        "result the first request, and another result on subsequent requests")
 
     args = parser.parse_args()
 
     # Default config file path.
     path = args.path
     if not os.path.isfile(path):
-        print '>> Please create a "dns.conf" file or specify a config path: ./fakedns.py [configfile]'
+        print '>> Please create a "dns.conf" file or specify a config path: ' \
+              './fakedns.py [configfile]'
         exit()
 
-    rules = ruleEngine(path)
+    rules = RuleEngine(path)
     re_list = rules.re_list
 
     interface = args.iface
@@ -424,7 +417,7 @@ if __name__ == '__main__':
 
     try:
         server = ThreadedUDPServer((interface, int(port)), UDPHandler)
-    except:
+    except socket.error:
         print ">> Could not start server -- is another program on udp:53?"
         exit(1)
 
