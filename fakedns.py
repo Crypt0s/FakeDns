@@ -290,7 +290,7 @@ class RuleEngine:
                 # I could do this at match-time, but i like speed, so I've
                 # decided to keep this in the rule parser and then work on the
                 # logging separate
-                if splitrule[0] == "AAAA":
+                if splitrule[0] == "AAAA" and splitrule[2] != "none":
                     if _is_shorthand_ip(splitrule[2]):
                         splitrule[2] = _explode_shorthand_ip_string(
                             splitrule[2])
@@ -315,7 +315,7 @@ class RuleEngine:
 
                 # TODO: More robust logging system - printing ipv6 rules
                 # requires specialness since I encode the ipv6 addr in-rule
-                if splitrule[0] == "AAAA":
+                if splitrule[0] == "AAAA" and splitrule[2] != "none":
                     print '>>', splitrule[1], '->', splitrule[2].encode('hex')
                 else:
                     print '>>', splitrule[1], '->', splitrule[2]
@@ -328,6 +328,9 @@ class RuleEngine:
         for rule in self.re_list:
             # Match on the domain, then on the query type
             if rule[1].match(query.dominio):
+                if query.type in TYPE.keys() and rule[0] == TYPE[query.type] and rule[2] == "none":
+                    return NONEFOUND(query).make_packet()
+
                 if query.type in TYPE.keys() and rule[0] == TYPE[query.type]:
                     # OK, this is a full match, fire away with the correct
                     # response type:
