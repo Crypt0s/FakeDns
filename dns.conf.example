@@ -1,5 +1,6 @@
 A .*reddit.* 8.8.8.8
 TXT .* HELLO
+# this is a comment
 AAAA lulz.com 2607:f8b0:4006:807::100e
 AAAA .* none
 A .*rebind.* 1.1.1.1 2.2.2.2
