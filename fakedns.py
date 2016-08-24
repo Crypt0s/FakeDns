@@ -360,7 +360,7 @@ class RuleEngine:
             # to our DNS server.
             s = socket.socket(type=socket.SOCK_DGRAM)
             s.settimeout(3.0)
-            addr = ('8.8.8.8', 53)
+            addr = ('%s' % (args.dns), 53)
             s.sendto(query.data, addr)
             data = s.recv(1024)
             s.close()
@@ -402,6 +402,10 @@ if __name__ == '__main__':
         '--rebind', dest='rebind', action='store_true', required=False,
         default=False, help="Enable DNS rebinding attacks - responds with one "
         "result the first request, and another result on subsequent requests")
+    parser.add_argument(
+        '--dns', dest='dns', action='store', default='8.8.8.8', required=False,
+        help='IP address of the upstream dns server - default 8.8.8.8'
+    )
 
     args = parser.parse_args()
 
