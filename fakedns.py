@@ -278,6 +278,10 @@ class RuleEngine:
             for rule in rules:
                 splitrule = rule.split()
 
+                # ignore rules starting with # to allow comments in config
+                if rule.startswith('#'):
+                    continue
+
                 # Make sure that the record type is one we currently support
                 # TODO: Straight-up let a user define a custome response type
                 # byte if we don't have one.
