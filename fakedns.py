@@ -366,7 +366,8 @@ class RuleEngine2:
             for rule in rules:
 
                 # ignore blank lines or lines starting with hashmark (coments)
-                if rule == "" or rule[0] == "#" or rule == '\n':
+                if rule == "" or rule.lstrip()[0] == "#" or rule == '\n':
+                    # thank you to github user cambid for the comments suggestion
                     continue
 
                 # Confirm that the rule has at least three columns to it
