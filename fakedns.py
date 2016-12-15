@@ -41,13 +41,15 @@ class DNSQuery:
             self.type = data[-4:-2]
 
 # Because python doesn't have native ENUM in 2.7:
+# https://en.wikipedia.org/wiki/List_of_DNS_record_types
 TYPE = {
     "\x00\x01": "A",
     "\x00\x1c": "AAAA",
     "\x00\x05": "CNAME",
     "\x00\x0c": "PTR",
     "\x00\x10": "TXT",
-    "\x00\x0f": "MX"
+    "\x00\x0f": "MX",
+    "\x00\x06":"SOA"
 }
 
 # Stolen:
@@ -281,7 +283,11 @@ class Rule (object):
 
     def match(self, req_type, domain, addr):
         # assert that the query type and domain match
-        req_type = TYPE[req_type]
+	
+        try:
+            req_type = TYPE[req_type]
+        except KeyError:
+            return None
 
         try:
             assert self.type == req_type
