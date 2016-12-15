@@ -1,5 +1,7 @@
 A .*reddit.* 8.8.8.8
 TXT .* HELLO
 AAAA lulz.com 2607:f8b0:4006:807::100e
-AAAA .* none
 A .*rebind.* 1.1.1.1 2.2.2.2
+A testrule.test 1.1.1.1,2.2.2.2,3.3.3.3
+A roundrobin 1.1.1.1 10%2.2.2.2,3.3.3.3,4.4.4.4
+# comment
