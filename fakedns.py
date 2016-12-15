@@ -11,8 +11,6 @@ import signal
 import argparse
 
 # inspired from DNSChef
-
-
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
     def __init__(self, server_address, request_handler):
         self.address_family = socket.AF_INET
@@ -29,13 +27,13 @@ class UDPHandler(SocketServer.BaseRequestHandler):
 class DNSQuery:
     def __init__(self, data):
         self.data = data
-        self.dominio = ''
+        self.domain = ''
         tipo = (ord(data[2]) >> 3) & 15  # Opcode bits
         if tipo == 0:  # Standard query
             ini = 12
             lon = ord(data[ini])
             while lon != 0:
-                self.dominio += data[ini + 1:ini + lon + 1] + '.'
+                self.domain += data[ini + 1:ini + lon + 1] + '.'
                 ini += lon + 1  # you can implement CNAME and PTR
                 lon = ord(data[ini])
             self.type = data[ini:][1:3]
@@ -54,8 +52,6 @@ TYPE = {
 
 # Stolen:
 # https://github.com/learningequality/ka-lite/blob/master/python-packages/django/utils/ipv6.py#L209
-
-
 def _is_shorthand_ip(ip_str):
     """Determine if the address is shortened.
     Args:
@@ -71,8 +67,6 @@ def _is_shorthand_ip(ip_str):
 
 # Stolen:
 # https://github.com/learningequality/ka-lite/blob/master/python-packages/django/utils/ipv6.py#L209
-
-
 def _explode_shorthand_ip_string(ip_str):
     """
     Expand a shortened IPv6 address.
@@ -162,12 +156,11 @@ class DNSResponse(object):
                 self.pointer + self.type + self.dnsclass + self.ttl + \
                 self.length + self.data
         except (TypeError, ValueError):
-            pdb.set_trace()
+            #pdb.set_trace()
+            pass
 
 # All classes need to set type, length, and data fields of the DNS Response
 # Finished
-
-
 class A(DNSResponse):
     def __init__(self, query, record):
         super(A, self).__init__(query)
@@ -182,8 +175,6 @@ class A(DNSResponse):
         return ''.join(chr(int(x)) for x in ip.split('.'))
 
 # Not implemented, need to get ipv6 to translate correctly into hex
-
-
 class AAAA(DNSResponse):
     def __init__(self, query, address):
         super(AAAA, self).__init__(query)
@@ -202,16 +193,12 @@ class AAAA(DNSResponse):
         ip = result[0][4][0]
 
 # Not yet implemented
-
-
 class CNAME(DNSResponse):
     def __init__(self, query):
         super(CNAME, self).__init__(query)
         self.type = "\x00\x05"
 
 # Not yet implemented
-
-
 class PTR(DNSResponse):
     def __init__(self, query, ptr_entry):
         super(PTR, self).__init__(query)
@@ -227,8 +214,6 @@ class PTR(DNSResponse):
             self.length = "\x00" + self.length
 
 # Finished
-
-
 class TXT(DNSResponse):
     def __init__(self, query, txt_record):
         super(TXT, self).__init__(query)
@@ -252,8 +237,6 @@ CASE = {
 }
 
 # Technically this is a subclass of A
-
-
 class NONEFOUND(DNSResponse):
     def __init__(self, query):
         super(NONEFOUND, self).__init__(query)
@@ -265,133 +248,246 @@ class NONEFOUND(DNSResponse):
         print ">> Built NONEFOUND response"
 
 
-class RuleEngine:
-    def __init__(self, file_):
+class Rule (object):
+    def __init__(self, rule_type, domain, ips, rebinds, threshold):
+        self.type = rule_type
+        self.domain = domain
+        self.ips = ips
+        self.rebinds = rebinds
+        self.rebind_threshold = threshold
 
-        # Hackish place to track our DNS rebinding
+        # we need an additional object to track the rebind rules
+        if self.rebinds is not None:
+            self.match_history = {}
+            self.rebinds = self._round_robin(rebinds)
+        self.ips = self._round_robin(ips)
+
+    def _round_robin(self, ip_list):
+        """
+        Creates a generator over a list modulo list length to equally move between all elements in the list each request
+        Since we have rules broken out into objects now, we can have this without much overhead.
+        """
+        # check to make sure we don't try to modulo by zero
+        # if we would, just add the same element to the list again.
+        if len(ip_list) == 1:
+            ip_list.append(ip_list[0])
+
+        # should be fine to continue now.
+        index = 0
+        while 1: # never stop iterating - it's OK since we dont always run
+            yield ip_list[index]
+            index += 1
+            index = index % len(ip_list)
+
+    def match(self, req_type, domain, addr):
+        # assert that the query type and domain match
+        req_type = TYPE[req_type]
+
+        try:
+            assert self.type == req_type
+        except AssertionError:
+            return None
+
+        try:
+            assert self.domain.match(domain)
+        except AssertionError:
+            return None
+
+        # Check to see if we have a rebind rule and if we do, return that addr first
+        if self.rebinds:
+            if self.match_history.has_key(addr):
+
+                # passed the threshold - start doing a rebind
+                if self.match_history[addr] >= self.rebind_threshold:
+                    return self.rebinds.next()
+
+                # plus one
+                else:
+                    self.match_history[addr] += 1
+
+            # add new client to this match history
+            else:
+                self.match_history[addr] = 1
+
+        # We didn't trip on any rebind rules (or didnt have any)
+        # but we're returning a rule-based entry based on the match
+        return self.ips.next()
+
+
+# Error classes for handling rule issues
+class RuleError_BadRegularExpression(Exception):
+    def __init__(self,lineno):
+        print "\n!! Malformed Regular Expression on rulefile line #%d\n\n" % lineno
+
+
+class RuleError_BadRuleType(Exception):
+    def __init__(self,lineno):
+        print "\n!! Rule type unsupported on rulefile line #%d\n\n" % lineno
+
+
+class RuleError_BadFormat(Exception):
+    def __init__(self,lineno):
+        print "\n!! Not Enough Parameters for rule on rulefile line #%d\n\n" % lineno
+
+
+class RuleEngine2:
+
+    # replaces the self keyword, but could be expanded to any keyword replacement
+    def _replace_self(self, ips):
+        # Deal with the user putting "self" in a rule (helpful if you don't know your IP)
+        for ip in ips:
+            if ip.lower() == 'self':
+                try:
+                    self_ip = socket.gethostbyname(socket.gethostname())
+                except socket.error:
+                    print ">> Could not get your IP address from your " \
+                          "DNS Server."
+                    self_ip = '127.0.0.1'
+                ips[ips.index(ip)] = self_ip
+        return ips
+
+
+    def __init__(self, file_):
+        """
+        Parses the DNS Rulefile, validates the rules, replaces keywords
+
+        """
+
+        # track DNS requests here
         self.match_history = {}
 
-        self.re_list = []
-        print '>>', 'Parse rules...'
+        self.rule_list = []
+
+        # A lol.com IP1,IP2,IP3,IP4,IP5,IP6 rebind_threshold%Rebind_IP1,Rebind_IP2
         with open(file_, 'r') as rulefile:
             rules = rulefile.readlines()
-            for rule in rules:
-                splitrule = rule.split()
+            lineno = 0 # keep track of line number for errors
 
-                # Make sure that the record type is one we currently support
-                # TODO: Straight-up let a user define a custome response type
-                # byte if we don't have one.
-                if splitrule[0] not in TYPE.values():
-                    print "Malformed rule :", rule, "Not Processed."
+            for rule in rules:
+
+                # ignore blank lines or lines starting with hashmark (coments)
+                if rule == "" or rule[0] == "#" or rule == '\n':
                     continue
 
-                # We need to do some housekeeping for ipv6 rules and turn
-                # them into full addresses if they are shorts.
-                # I could do this at match-time, but i like speed, so I've
-                # decided to keep this in the rule parser and then work on the
-                # logging separate
-                if splitrule[0] == "AAAA" and splitrule[2] != "none":
-                    if _is_shorthand_ip(splitrule[2]):
-                        splitrule[2] = _explode_shorthand_ip_string(
-                            splitrule[2])
-                    # OK Now we need to get the ip broken into something that
-                    # the DNS response can have in it
-                    splitrule[2] = splitrule[2].replace(":", "").decode('hex')
-                    # That is what goes into the DNS request.
+                # Confirm that the rule has at least three columns to it
+                if len(rule.split()) < 3:
+                    raise RuleError_BadFormat(lineno)
 
-                # If the ip is 'self' transform it to local ip.
-                if splitrule[2] == 'self':
-                    try:
-                        ip = socket.gethostbyname(socket.gethostname())
-                    except socket.error:
-                        print ">> Could not get your IP address from your " \
-                              "DNS Server."
-                        ip = '127.0.0.1'
-                    splitrule[2] = ip
+                # break the rule out into its components
+                s_rule = rule.split()
+                rule_type = s_rule[0].upper()
+                domain = s_rule[1]
+                ips = s_rule[2].split(',') # allow multiple ip's thru commas
 
-                # things after the third element will be dnsrebind args
-                self.re_list.append(
-                    [splitrule[0], re.compile(splitrule[1])] + splitrule[2:])
-
-                # TODO: More robust logging system - printing ipv6 rules
-                # requires specialness since I encode the ipv6 addr in-rule
-                if splitrule[0] == "AAAA" and splitrule[2] != "none":
-                    print '>>', splitrule[1], '->', splitrule[2].encode('hex')
+                # only try this if the rule is long enough
+                if len(s_rule) == 4:
+                    rebinds = s_rule[3]
+                    # handle old rule style (maybe someone updated)
+                    if '%' in rebinds:
+                        rebind_threshold,rebinds = rebinds.split('%')
+                        rebinds = rebinds.split(',')
+                        rebind_threshold = int(rebind_threshold)
+                    else:
+                        # in the old days we assumed a rebind thresh of 1
+                        rebind_threshold = 1
                 else:
-                    print '>>', splitrule[1], '->', splitrule[2]
+                    rebinds = None
+                    rebind_threshold = None
 
-            print '>>', str(len(rules)), "rules parsed"
+                # Validate the rule
+                # make sure we understand this type of response
+                if rule_type not in TYPE.values():
+                    raise RuleError_BadRuleType(lineno)
+                # attempt to parse the regex (if any) in the domain field
+                try:
+                    domain = re.compile(domain)
+                except:
+                    raise RuleError_BadRegularExpression(lineno)
 
-    # Matching has now been moved into the RuleEngine so that we don't repeat
-    # ourselves
+                # replace self in the list of ips and list of rebinds (if any)
+                ips = self._replace_self(ips)
+                if rebinds is not None:
+                    rebinds = self._replace_self(rebinds)
+
+                # Deal With Special IPv6 Nonsense
+                if rule_type.upper() == "AAAA":
+                    tmp_ip_array = []
+                    for ip in ips:
+                        if _is_shorthand_ip(ip):
+                            ip = _explode_shorthand_ip_string(ip)
+
+                        ip = ip.replace(":", "").decode('hex')
+                        tmp_ip_array.append(ip)
+                    ips = tmp_ip_array
+
+
+                # add the validated and parsed rule into our list of rules
+                self.rule_list.append(Rule(rule_type, domain, ips, rebinds, rebind_threshold))
+
+                # increment the line number
+                lineno += 1
+
+            print ">> Parsed %d rules from %s" % (len(self.rule_list),file_)
+
+
     def match(self, query, addr):
-        for rule in self.re_list:
-            # Match on the domain, then on the query type
-            if rule[1].match(query.dominio):
-                if query.type in TYPE.keys() and rule[0] == TYPE[query.type] and rule[2] == "none":
+        """
+        See if the request matches any rules in the rule list by calling the
+        match function of each rule in the list
+
+        The rule checks two things before it continues so I imagine this is
+        probably still fast
+
+        """
+        for rule in self.rule_list:
+            result = rule.match(query.type, query.domain, addr)
+            if result is not None:
+                response_data = result
+
+                # Return Nonefound if the rule says "none"
+                if response_data.lower() == 'none':
                     return NONEFOUND(query).make_packet()
 
-                if query.type in TYPE.keys() and rule[0] == TYPE[query.type]:
-                    # OK, this is a full match, fire away with the correct
-                    # response type:
+                response = CASE[query.type](query, response_data)
 
-                    # Check our DNS Rebinding tracker and see if we need to
-                    # respond with the second address now...
-                    if args.rebind and len(rule) >= 3 and \
-                            addr in self.match_history.keys():
-                        # use second address (rule[3])
-                        response_data = rule[3]
-                        self.match_history[addr] += 1
-                    elif args.rebind and len(rule) >= 3:
-                        self.match_history[addr] = 1
-                        response_data = rule[2]
-                    else:
-                        response_data = rule[2]
+                print ">> Matched Request - " + query.domain
+                return response.make_packet()
 
-                    response = CASE[query.type](query, response_data)
-                    print ">> Matched Request - " + query.dominio
-                    return response.make_packet()
-
-        # OK, we don't have a rule for it, lets see if it exists...
+        # if we got here, we didn't match.
+        # Forward a request that we didnt have a rule for to someone else
         try:
-            # We need to handle the request potentially being a TXT,A,MX,
-            # ect... request.
-            # So....we make a socket and literally just forward the request raw
-            # to our DNS server.
             s = socket.socket(type=socket.SOCK_DGRAM)
             s.settimeout(3.0)
             addr = ('8.8.8.8', 53)
             s.sendto(query.data, addr)
             data = s.recv(1024)
             s.close()
-            print "Unmatched Request " + query.dominio
+            print "Unmatched Request " + query.domain
             return data
-        except socket.error:
-            # We really shouldn't end up here, but if we do, we want to handle
-            # it gracefully and not let down the client. The cool thing about
-            # this is that NOTFOUND will take the type straight out of the query
-            # object and build the correct query response type from that
-            # automagically.
+        except socket.error, e:
+            # We shouldn't wind up here but if we do, don't drop the request
+            # send the client *something*
             print ">> Error was handled by sending NONEFOUND"
+            print e
             return NONEFOUND(query).make_packet()
 
+
 # Convenience method for threading.
-
-
 def respond(data, addr, s):
     p = DNSQuery(data)
     response = rules.match(p, addr[0])
     s.sendto(response, addr)
     return response
 
-
+# Capture Control-C and handle here
 def signal_handler(signal, frame):
     print 'Exiting...'
     sys.exit(0)
 
+
 if __name__ == '__main__':
 
-    parser = argparse.ArgumentParser(description='things and stuff')
+    parser = argparse.ArgumentParser(description='FakeDNS - A Python DNS Server')
     parser.add_argument(
         '-c', dest='path', action='store', required=True,
         help='Path to configuration file')
@@ -405,6 +501,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+
     # Default config file path.
     path = args.path
     if not os.path.isfile(path):
@@ -412,8 +509,8 @@ if __name__ == '__main__':
               './fakedns.py [configfile]'
         exit()
 
-    rules = RuleEngine(path)
-    re_list = rules.re_list
+    rules = RuleEngine2(path)
+    rule_list = rules.rule_list
 
     interface = args.iface
     port = 53
@@ -425,6 +522,8 @@ if __name__ == '__main__':
         exit(1)
 
     server.daemon = True
+
+    # Tell python what happens if someone presses ctrl-C
     signal.signal(signal.SIGINT, signal_handler)
     server.serve_forever()
     server_thread.join()
