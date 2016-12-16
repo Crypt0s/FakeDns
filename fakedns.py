@@ -506,6 +506,9 @@ if __name__ == '__main__':
         '-i', dest='iface', action='store', default='0.0.0.0', required=False,
         help='IP address you wish to run FakeDns with - default all')
     parser.add_argument(
+        '-p', dest='port', action='store', default=53, required=False,
+        help='Port number you wish to run FakeDns')
+    parser.add_argument(
         '--rebind', dest='rebind', action='store_true', required=False,
         default=False, help="Enable DNS rebinding attacks - responds with one "
         "result the first request, and another result on subsequent requests")
@@ -531,12 +534,12 @@ if __name__ == '__main__':
     rule_list = rules.rule_list
 
     interface = args.iface
-    port = 53
+    port = args.port
 
     try:
         server = ThreadedUDPServer((interface, int(port)), UDPHandler)
     except socket.error:
-        print ">> Could not start server -- is another program on udp:53?"
+        print ">> Could not start server -- is another program on udp:{0}?".format(port)
         exit(1)
 
     server.daemon = True
