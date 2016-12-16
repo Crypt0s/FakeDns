@@ -158,7 +158,6 @@ class DNSResponse(object):
                 self.pointer + self.type + self.dnsclass + self.ttl + \
                 self.length + self.data
         except (TypeError, ValueError):
-            #pdb.set_trace()
             pass
 
 # All classes need to set type, length, and data fields of the DNS Response
@@ -176,7 +175,7 @@ class A(DNSResponse):
         # Convert to hex
         return ''.join(chr(int(x)) for x in ip.split('.'))
 
-# Not implemented, need to get ipv6 to translate correctly into hex
+# Implemented
 class AAAA(DNSResponse):
     def __init__(self, query, address):
         super(AAAA, self).__init__(query)
@@ -200,16 +199,16 @@ class CNAME(DNSResponse):
         super(CNAME, self).__init__(query)
         self.type = "\x00\x05"
 
-# Not yet implemented
+# Implemented
 class PTR(DNSResponse):
     def __init__(self, query, ptr_entry):
         super(PTR, self).__init__(query)
         self.type = "\x00\x0c"
-
+        self.ttl = "\x00\x00\x00\x00"
         ptr_split = ptr_entry.split('.')
         ptr_entry = "\x07".join(ptr_split)
 
-        self.data = "\x0e" + ptr_entry + "\x00"
+        self.data = "\x09" + ptr_entry + "\x00"
         self.length = chr(len(ptr_entry) + 2)
         # Again, must be 2-byte value.
         if self.length < '\xff':
@@ -283,7 +282,7 @@ class Rule (object):
 
     def match(self, req_type, domain, addr):
         # assert that the query type and domain match
-	
+
         try:
             req_type = TYPE[req_type]
         except KeyError:
@@ -462,6 +461,11 @@ class RuleEngine2:
 
         # if we got here, we didn't match.
         # Forward a request that we didnt have a rule for to someone else
+
+        # if the user said not to forward requests, and we are here, it's time to send a NONEFOUND
+        if args.noforward:
+            print ">> Don't Forward %s" % query.domain
+            return NONEFOUND(query).make_packet()
         try:
             s = socket.socket(type=socket.SOCK_DGRAM)
             s.settimeout(3.0)
@@ -509,9 +513,12 @@ if __name__ == '__main__':
         '--dns', dest='dns', action='store', default='8.8.8.8', required=False,
         help='IP address of the upstream dns server - default 8.8.8.8'
     )
+    parser.add_argument(
+        '--noforward', dest='noforward', action='store_true', default=False, required=False,
+        help='Sets if FakeDNS should forward any non-matching requests'
+    )
 
     args = parser.parse_args()
-
 
     # Default config file path.
     path = args.path
