@@ -5,3 +5,5 @@ A .*rebind.* 1.1.1.1 2.2.2.2
 A testrule.test 1.1.1.1,2.2.2.2,3.3.3.3
 A roundrobin 1.1.1.1 10%2.2.2.2,3.3.3.3,4.4.4.4
 # comment
+# A sample PTR entry, note the backwards IP here is required.
+PTR 1.0.0.127 localhost
