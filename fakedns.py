@@ -10,6 +10,13 @@ import SocketServer
 import signal
 import argparse
 
+# Use of ANSI escape sequences to output colored text
+class bcolors:
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
     def __init__(self, server_address, request_handler):
@@ -246,7 +253,7 @@ class NONEFOUND(DNSResponse):
         self.rranswers = "\x00\x00"
         self.length = "\x00\x00"
         self.data = "\x00"
-        print ">> Built NONEFOUND response"
+        print bcolors.WARNING + "[*]" + bcolors.ENDC + " Built NONEFOUND response"
 
 
 class Rule (object):
@@ -322,17 +329,17 @@ class Rule (object):
 # Error classes for handling rule issues
 class RuleError_BadRegularExpression(Exception):
     def __init__(self,lineno):
-        print "\n!! Malformed Regular Expression on rulefile line #%d\n\n" % lineno
+        print "\n" + bcolors.FAIL + "[x]" + bcolors.ENDC + " Malformed Regular Expression on rulefile line #%d\n\n" % lineno
 
 
 class RuleError_BadRuleType(Exception):
     def __init__(self,lineno):
-        print "\n!! Rule type unsupported on rulefile line #%d\n\n" % lineno
+        print "\n" + bcolors.FAIL + "[x]" + bcolors.ENDC + " Rule type unsupported on rulefile line #%d\n\n" % lineno
 
 
 class RuleError_BadFormat(Exception):
     def __init__(self,lineno):
-        print "\n!! Not Enough Parameters for rule on rulefile line #%d\n\n" % lineno
+        print "\n" + bcolors.FAIL + "[x]" + bcolors.ENDC + " Not Enough Parameters for rule on rulefile line #%d\n\n" % lineno
 
 
 class RuleEngine2:
@@ -345,7 +352,7 @@ class RuleEngine2:
                 try:
                     self_ip = socket.gethostbyname(socket.gethostname())
                 except socket.error:
-                    print ">> Could not get your IP address from your " \
+                    print bcolors.FAIL + "[x]" + bcolors.ENDC + " Could not get your IP address from your " \
                           "DNS Server."
                     self_ip = '127.0.0.1'
                 ips[ips.index(ip)] = self_ip
@@ -433,7 +440,7 @@ class RuleEngine2:
                 # increment the line number
                 lineno += 1
 
-            print ">> Parsed %d rules from %s" % (len(self.rule_list),file_)
+            print bcolors.OKGREEN + "[*]" + bcolors.ENDC + " Parsed %d rules from %s" % (len(self.rule_list),file_)
 
 
     def match(self, query, addr):
@@ -456,7 +463,7 @@ class RuleEngine2:
 
                 response = CASE[query.type](query, response_data)
 
-                print ">> Matched Request - " + query.domain
+                print bcolors.OKGREEN + "[+]" + bcolors.ENDC + " Matched Request - " + query.domain
                 return response.make_packet()
 
         # if we got here, we didn't match.
@@ -464,7 +471,7 @@ class RuleEngine2:
 
         # if the user said not to forward requests, and we are here, it's time to send a NONEFOUND
         if args.noforward:
-            print ">> Don't Forward %s" % query.domain
+            print bcolors.WARNING + "[*]" + bcolors.ENDC + " Don't Forward %s" % query.domain
             return NONEFOUND(query).make_packet()
         try:
             s = socket.socket(type=socket.SOCK_DGRAM)
@@ -473,12 +480,12 @@ class RuleEngine2:
             s.sendto(query.data, addr)
             data = s.recv(1024)
             s.close()
-            print "Unmatched Request " + query.domain
+            print bcolors.FAIL + "[x]" + bcolors.ENDC + " Unmatched Request " + query.domain
             return data
         except socket.error, e:
             # We shouldn't wind up here but if we do, don't drop the request
             # send the client *something*
-            print ">> Error was handled by sending NONEFOUND"
+            print bcolors.FAIL + "[x]" + bcolors.ENDC + " Error was handled by sending NONEFOUND"
             print e
             return NONEFOUND(query).make_packet()
 
@@ -526,7 +533,7 @@ if __name__ == '__main__':
     # Default config file path.
     path = args.path
     if not os.path.isfile(path):
-        print '>> Please create a "dns.conf" file or specify a config path: ' \
+        print bcolors.WARNING + "[*]" + bcolors.ENDC + ' Please create a "dns.conf" file or specify a config path: ' \
               './fakedns.py [configfile]'
         exit()
 
@@ -539,7 +546,7 @@ if __name__ == '__main__':
     try:
         server = ThreadedUDPServer((interface, int(port)), UDPHandler)
     except socket.error:
-        print ">> Could not start server -- is another program on udp:{0}?".format(port)
+        print bcolors.FAIL + "[x]" + bcolors.ENDC + " Could not start server -- is another program on udp:{0}?".format(port)
         exit(1)
 
     server.daemon = True
