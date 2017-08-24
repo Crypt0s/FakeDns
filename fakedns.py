@@ -18,6 +18,8 @@ class bcolors:
     FAIL = '\033[91m'
     ENDC = '\033[0m'
 
+file_log = open ("dns_origin.log", "w")
+
 
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
@@ -476,6 +478,7 @@ class RuleEngine2:
 
                 print "( "+str(datetime.now())+ ") " +bcolors.OKGREEN + "[+]" + bcolors.ENDC + " Matched Request - " + \
                       query.domain + " original query " + bcolors.WARNING + query.origin + bcolors.ENDC
+                file_log.write(query.origin+"\n")
                 return response.make_packet()
 
         # if we got here, we didn't match.
@@ -494,6 +497,7 @@ class RuleEngine2:
             s.close()
             print "( "+str(datetime.now())+ ") " + bcolors.FAIL + "[x]" + bcolors.ENDC + " Unmatched Request " + \
                   query.domain + " Original query " + bcolors.FAIL + query.origin + bcolors.ENDC
+            file_log.write(query.origin+"\n")
             return data
         except socket.error, e:
             # We shouldn't wind up here but if we do, don't drop the request
