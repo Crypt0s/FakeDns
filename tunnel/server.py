@@ -186,7 +186,7 @@ if __name__ == "__main__":
     destination = conf.get("SERVER", "dest")
 
     sock_out = socket.socket(type=socket.SOCK_DGRAM)
-    addr = ('%s' % ("127.0.0.1"), 53)
+    addr = ('%s' % (conf.get("SERVER","destip")), conf.getint("SERVER","destport"))
 
     # pdb.set_trace()
     p_obj = pcap.pcapObject()
