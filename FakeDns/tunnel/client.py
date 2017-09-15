@@ -9,7 +9,7 @@ import base64
 
 # process packets
 def process(dns_packet):
-    packet = FakeDns.DNSQuery
+    packet = FakeDns.DNSQuery_old
     data = packet(dns_packet).domain
     data = data.translate(None,".")
     data = base64.b64decode(data)
