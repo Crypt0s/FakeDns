@@ -11,7 +11,6 @@ import random
 sys.path.append("../")
 import FakeDns
 
-
 # transaction id    query type     questions     Answer RRs  Authority RR    additional rrs   ????  query     end   type  class
 #      xx xx         0x0100         00001          0000        0000             0000           02  [x-250]    00    0001  0001
 #     random         Standard       normal                                                                
@@ -179,7 +178,7 @@ if __name__ == "__main__":
     conf = ConfigParser.ConfigParser()
     conf.read("tunnel.conf")
 
-    destination = conf.get("SERVER", "dest")
+    #destination = conf.get("SERVER", "destip")
 
     sock_out = socket.socket(type=socket.SOCK_DGRAM)
     addr = ('%s' % (conf.get("SERVER","destip")), conf.getint("SERVER","destport"))
