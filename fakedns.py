@@ -419,6 +419,9 @@ class RuleEngine2:
                 if rule_type.upper() == "AAAA":
                     tmp_ip_array = []
                     for ip in ips:
+                        if ip.lower() == 'none':
+                            tmp_ip_array.append(ip)
+                            continue
                         if _is_shorthand_ip(ip):
                             ip = _explode_shorthand_ip_string(ip)
 
