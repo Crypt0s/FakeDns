@@ -9,7 +9,7 @@
 FROM ubuntu
 COPY . /opt/FakeDns/
 RUN /bin/bash -c 'apt-get update && apt-get -y install python-libpcap iproute2 nano python2.7; cd /opt/FakeDns/; python2.7 setup.py install'
-CMD python2.7 /opt/FakeDns/FakeDns/tunnel/server.py
+CMD cd /opt/FakeDns/; python2.7 /opt/FakeDns/FakeDns.py -c dns.conf.example
 EXPOSE 53
 
 #docker run -it --privileged -P <container> /bin/bash
