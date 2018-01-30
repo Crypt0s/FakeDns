@@ -27,11 +27,11 @@ Supported Request Types
     - A
     - TXT
     - AAAA
+    - PTR
 
 In-Progress Request Types
 =========================
     - MX
-    - PTR
     - CNAME
 
 Misc
