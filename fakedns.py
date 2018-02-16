@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Fakedns.py: A regular-expression based DNS MITM Server by Crypt0s."""
 
-import pdb
 import socket
 import re
 import sys
@@ -9,6 +8,18 @@ import os
 import SocketServer
 import signal
 import argparse
+from datetime import datetime
+
+
+# Use of ANSI escape sequences to output colored text
+class bcolors:
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+
+file_log = open ("dns_origin.log", "w")
+
 
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
@@ -34,9 +45,11 @@ class DNSQuery:
             lon = ord(data[ini])
             while lon != 0:
                 self.domain += data[ini + 1:ini + lon + 1] + '.'
+                self.origin = self.domain
+                self.domain = self.domain.lower()
                 ini += lon + 1  # you can implement CNAME and PTR
                 lon = ord(data[ini])
-            self.type = data[ini:][1:3]
+                self.type = data[ini:][1:3]
         else:
             self.type = data[-4:-2]
 
@@ -49,8 +62,9 @@ TYPE = {
     "\x00\x0c": "PTR",
     "\x00\x10": "TXT",
     "\x00\x0f": "MX",
-    "\x00\x06":"SOA"
+    "\x00\x06": "SOA"
 }
+
 
 # Stolen:
 # https://github.com/learningequality/ka-lite/blob/master/python-packages/django/utils/ipv6.py#L209
@@ -66,6 +80,7 @@ def _is_shorthand_ip(ip_str):
     if any(len(x) < 4 for x in ip_str.split(':')):
         return True
     return False
+
 
 # Stolen:
 # https://github.com/learningequality/ka-lite/blob/master/python-packages/django/utils/ipv6.py#L209
@@ -160,6 +175,7 @@ class DNSResponse(object):
         except (TypeError, ValueError):
             pass
 
+
 # All classes need to set type, length, and data fields of the DNS Response
 # Finished
 class A(DNSResponse):
@@ -174,6 +190,7 @@ class A(DNSResponse):
         ip = dns_record
         # Convert to hex
         return ''.join(chr(int(x)) for x in ip.split('.'))
+
 
 # Implemented
 class AAAA(DNSResponse):
@@ -193,11 +210,13 @@ class AAAA(DNSResponse):
         # just returns the first answer and only the address
         ip = result[0][4][0]
 
+
 # Not yet implemented
 class CNAME(DNSResponse):
     def __init__(self, query):
         super(CNAME, self).__init__(query)
         self.type = "\x00\x05"
+
 
 # Implemented
 class PTR(DNSResponse):
@@ -213,6 +232,7 @@ class PTR(DNSResponse):
         # Again, must be 2-byte value.
         if self.length < '\xff':
             self.length = "\x00" + self.length
+
 
 # Finished
 class TXT(DNSResponse):
@@ -237,6 +257,7 @@ CASE = {
     "\x00\x10": TXT
 }
 
+
 # Technically this is a subclass of A
 class NONEFOUND(DNSResponse):
     def __init__(self, query):
@@ -246,7 +267,7 @@ class NONEFOUND(DNSResponse):
         self.rranswers = "\x00\x00"
         self.length = "\x00\x00"
         self.data = "\x00"
-        print ">> Built NONEFOUND response"
+        print bcolors.WARNING + "[*]" + bcolors.ENDC + " Built NONEFOUND response"
 
 
 class Rule (object):
@@ -322,17 +343,20 @@ class Rule (object):
 # Error classes for handling rule issues
 class RuleError_BadRegularExpression(Exception):
     def __init__(self,lineno):
-        print "\n!! Malformed Regular Expression on rulefile line #%d\n\n" % lineno
+        print "\n" + bcolors.FAIL + "[x]" + bcolors.ENDC + " Malformed Regular Expression on rulefile line #%d\n\n" \
+                                                           % lineno
 
 
 class RuleError_BadRuleType(Exception):
     def __init__(self,lineno):
-        print "\n!! Rule type unsupported on rulefile line #%d\n\n" % lineno
+        print "\n" + bcolors.FAIL + "[x]" + bcolors.ENDC + " Rule type unsupported on rulefile line #%d\n\n" \
+                                                           % lineno
 
 
 class RuleError_BadFormat(Exception):
     def __init__(self,lineno):
-        print "\n!! Not Enough Parameters for rule on rulefile line #%d\n\n" % lineno
+        print "\n" + bcolors.FAIL + "[x]" + bcolors.ENDC + " Not Enough Parameters for rule on rulefile line #%d\n\n" \
+                                                           % lineno
 
 
 class RuleEngine2:
@@ -345,12 +369,11 @@ class RuleEngine2:
                 try:
                     self_ip = socket.gethostbyname(socket.gethostname())
                 except socket.error:
-                    print ">> Could not get your IP address from your " \
+                    print bcolors.FAIL + "[x]" + bcolors.ENDC + " Could not get your IP address from your " \
                           "DNS Server."
                     self_ip = '127.0.0.1'
                 ips[ips.index(ip)] = self_ip
         return ips
-
 
     def __init__(self, file_):
         """
@@ -428,16 +451,13 @@ class RuleEngine2:
                         ip = ip.replace(":", "").decode('hex')
                         tmp_ip_array.append(ip)
                     ips = tmp_ip_array
-
-
                 # add the validated and parsed rule into our list of rules
                 self.rule_list.append(Rule(rule_type, domain, ips, rebinds, rebind_threshold))
 
                 # increment the line number
                 lineno += 1
 
-            print ">> Parsed %d rules from %s" % (len(self.rule_list),file_)
-
+            print bcolors.OKGREEN + "[*]" + bcolors.ENDC + " Parsed %d rules from %s" % (len(self.rule_list),file_)
 
     def match(self, query, addr):
         """
@@ -459,7 +479,9 @@ class RuleEngine2:
 
                 response = CASE[query.type](query, response_data)
 
-                print ">> Matched Request - " + query.domain
+                print "( "+str(datetime.now())+ ") " +bcolors.OKGREEN + "[+]" + bcolors.ENDC + " Matched Request - " + \
+                      query.domain + " original query " + bcolors.WARNING + query.origin + bcolors.ENDC
+                file_log.write(query.origin+"\n")
                 return response.make_packet()
 
         # if we got here, we didn't match.
@@ -467,21 +489,23 @@ class RuleEngine2:
 
         # if the user said not to forward requests, and we are here, it's time to send a NONEFOUND
         if args.noforward:
-            print ">> Don't Forward %s" % query.domain
+            print bcolors.WARNING + "[*]" + bcolors.ENDC + " Don't Forward %s" % query.domain
             return NONEFOUND(query).make_packet()
         try:
             s = socket.socket(type=socket.SOCK_DGRAM)
             s.settimeout(3.0)
-            addr = ('%s' % (args.dns), 53)
+            addr = ('%s' % args.dns, 53)
             s.sendto(query.data, addr)
             data = s.recv(1024)
             s.close()
-            print "Unmatched Request " + query.domain
+            print "( "+str(datetime.now())+ ") " + bcolors.FAIL + "[x]" + bcolors.ENDC + " Unmatched Request " + \
+                  query.domain + " Original query " + bcolors.FAIL + query.origin + bcolors.ENDC
+            file_log.write(query.origin+"\n")
             return data
         except socket.error, e:
             # We shouldn't wind up here but if we do, don't drop the request
             # send the client *something*
-            print ">> Error was handled by sending NONEFOUND"
+            print bcolors.FAIL + "[x]" + bcolors.ENDC + " Error was handled by sending NONEFOUND"
             print e
             return NONEFOUND(query).make_packet()
 
@@ -492,6 +516,7 @@ def respond(data, addr, s):
     response = rules.match(p, addr[0])
     s.sendto(response, addr)
     return response
+
 
 # Capture Control-C and handle here
 def signal_handler(signal, frame):
@@ -529,7 +554,7 @@ if __name__ == '__main__':
     # Default config file path.
     path = args.path
     if not os.path.isfile(path):
-        print '>> Please create a "dns.conf" file or specify a config path: ' \
+        print bcolors.WARNING + "[*]" + bcolors.ENDC + ' Please create a "dns.conf" file or specify a config path: ' \
               './fakedns.py [configfile]'
         exit()
 
@@ -542,7 +567,8 @@ if __name__ == '__main__':
     try:
         server = ThreadedUDPServer((interface, int(port)), UDPHandler)
     except socket.error:
-        print ">> Could not start server -- is another program on udp:{0}?".format(port)
+        print bcolors.FAIL + "[x]" + bcolors.ENDC + " Could not start server -- is another program on " \
+                                                    "udp:{0}?".format(port)
         exit(1)
 
     server.daemon = True
