@@ -406,7 +406,7 @@ class RuleEngine2:
                     raise RuleError_BadRuleType(lineno)
                 # attempt to parse the regex (if any) in the domain field
                 try:
-                    domain = re.compile(domain)
+                    domain = re.compile(domain, flags=re.IGNORECASE)
                 except:
                     raise RuleError_BadRegularExpression(lineno)
 
