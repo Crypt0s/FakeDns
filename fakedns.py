@@ -151,7 +151,7 @@ class RuleEngine2:
             for rule in rules:
 
                 # ignore blank lines or lines starting with hashmark (coments)
-                if rule == "" or rule.lstrip()[0] == "#" or rule == '\n':
+                if len(rule.strip()) == 0 or rule.lstrip()[0] == "#" or rule == '\n':
                     # thank you to github user cambid for the comments suggestion
                     continue
 
@@ -186,7 +186,7 @@ class RuleEngine2:
                     raise RuleError_BadRuleType(lineno+1)
                 # attempt to parse the regex (if any) in the domain field
                 try:
-                    domain = re.compile(domain)
+                    domain = re.compile(domain, flags=re.IGNORECASE)
                 except:
                     raise RuleError_BadRegularExpression(lineno+1)
 
@@ -199,6 +199,9 @@ class RuleEngine2:
                 if rule_type.upper() == "AAAA":
                     tmp_ip_array = []
                     for ip in ips:
+                        if ip.lower() == 'none':
+                            tmp_ip_array.append(ip)
+                            continue
                         if FakeDns._is_shorthand_ip(ip):
                             ip = FakeDns._explode_shorthand_ip_string(ip)
 
