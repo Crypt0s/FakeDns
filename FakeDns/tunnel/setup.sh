@@ -1,7 +1,8 @@
 #!/bin/bash
-echo "Creating tun for user $1"
-ip link delete tun0
-ip tuntap add dev tun0 mode tun user $1 group $1
+USR=`whoami`
+echo "Creating tun for current user $USR -- you must run FakeDNS as this user."
+ip link delete tun0 &> /dev/null
+ip tuntap add dev tun0 mode tun user $USR group $USR
 ip link set tun0 up
 ip addr add 10.0.0.1/24 dev tun0
 echo "DONE STAGE 1"
