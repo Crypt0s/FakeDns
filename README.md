@@ -87,4 +87,5 @@ You'll then be at a docker root bash prompt which you can use to install python2
     cd /opt
     python fakedns -c dns.conf.example
 
+If you're new to docker and you don't have any other docker containers running, you'll probably have an IP of 172.17.0.2 for your now-running container, which you can hit using nslookup.
 From there you'll be able to figure it out.  If there's enough interest I will make a script for this or a docker image which will be pushed to the docker community hub.
