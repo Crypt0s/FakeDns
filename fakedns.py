@@ -9,6 +9,7 @@ import os
 import SocketServer
 import signal
 import argparse
+import struct
 
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
@@ -129,10 +130,49 @@ def _get_question_section(query):
     return query.data[start_idx:end_idx]
 
 
+class DNSFlag:
+    # qr  opcode   aa   tc  rd  ra  z    rcode
+    # 1   0000     0    0   1   1   000  0000
+    # accept a series of kwargs to build a proper flags segment.
+    def __init__(self,
+                qr=0b1,        # query record, 1 if response
+                opcode=0b0000, # 0 = query, 1 = inverse query, 2 = status request 3-15 unused
+                aa=0b0,        # authoritative answer = 1
+                tc=0b0,        # truncation - 1 if truncated
+                rd=0b1,        # recursion desired?
+                ra=0b1,        # recursion available
+                z=0b000,       # Reserved, must be zero in queries and responsed
+                rcode=0b0000   # errcode, 0 none, 1 format, 2 server, 3 name, 4 not impl, 5 refused, 6-15 unused
+                 ):
+
+        # pack the elements into an integer
+        flag_field = qr
+        flag_field = flag_field << 4
+        flag_field ^= opcode
+        flag_field = flag_field << 1
+        flag_field ^= aa
+        flag_field = flag_field << 1
+        flag_field ^= tc
+        flag_field = flag_field << 1
+        flag_field ^= rd
+        flag_field = flag_field << 1
+        flag_field ^= ra
+        flag_field = flag_field << 3
+        flag_field ^= z
+        flag_field = flag_field << 4
+        flag_field ^= rcode
+
+        self.flag_field = flag_field
+
+    # return char rep.
+    def pack(self):
+        return struct.pack(">H", self.flag_field)
+
+
 class DNSResponse(object):
     def __init__(self, query):
         self.id = query.data[:2]  # Use the ID from the request.
-        self.flags = "\x81\x80"  # No errors, we never have those.
+        self.flags = DNSFlag(aa=args.authoritative).pack()
         self.questions = query.data[4:6]  # Number of questions asked...
         # Answer RRs (Answer resource records contained in response) 1 for now.
         self.rranswers = "\x00\x01"
@@ -524,7 +564,17 @@ if __name__ == '__main__':
         help='Sets if FakeDNS should forward any non-matching requests'
     )
 
+    # todo: remove this - it's confusing, and we should be able to set this per-record. Keep for now for quickness.
+    parser.add_argument(
+        '--non-authoritative', dest='non_authoritative', action='store_true', default=False, required=False,
+        help='Sets if FakeDNS should not report as an authority for any matching DNS Queries'
+    )
+
     args = parser.parse_args()
+
+    # if non-authoritative is set to true, it'll cancel out the default authoritative setting
+    # this is a not-very-coherent way to pull this off but we'll be changing the behavior of FakeDNS soon so it's OK
+    args.authoritative = True ^ args.non_authoritative
 
     # Default config file path.
     path = args.path
