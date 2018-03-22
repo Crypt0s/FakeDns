@@ -22,6 +22,7 @@ the `self` syntax sugar will be translated to your current machine's local ip ad
 
 If a match is not made, the DNS server will attempt to resolve the request using whatever you have your DNS server set to on your local machine and will proxy the request to that server on behalf of the requesting user.
 
+
 Supported Request Types
 =======================
     - A
@@ -37,7 +38,7 @@ In-Progress Request Types
 Misc
 ====
     - Supports DNS Rebinding
-    - Supports Round round-robin
+    - Supports round-robin
 
 
 Round-Robin
@@ -65,3 +66,25 @@ For example:
 Means that we have an A record for rebind.net which evaluates to 1.1.1.1 for the first 10 tries.  On the 11th request from a client which has already made 10 requests, FakeDNS starts serving out the second ip, 4.5.6.7
 
 You can use a list of addresses here and FakeDNS will round-robin them for you, just like in the "regular" rule.
+
+
+Testing FakeDNS in Docker
+======
+_(localhost only without extra steps)_
+
+I have had a lot of success testing/developing FakeDNS in Docker because it's easier than running it natively on modern Ubuntu installs which have their own DNS services running on port 53 already.
+
+If you want to try it out, you can do so without much heavy lifting by following these steps:
+
+Assuming you are **_inside the FakeDns directory_**:
+
+    sudo docker pull ubuntu
+    sudo docker run -it -v `pwd`:/opt -P --privileged --expose 53 ubuntu:latest /bin/bash
+    
+You'll then be at a docker root bash prompt which you can use to install python2.7 and run FakeDns:
+
+    apt-get update && apt-get install -y python
+    cd /opt
+    python fakedns -c dns.conf.example
+
+From there you'll be able to figure it out.  If there's enough interest I will make a script for this or a docker image which will be pushed to the docker community hub.
