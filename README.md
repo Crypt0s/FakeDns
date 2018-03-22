@@ -37,7 +37,7 @@ In-Progress Request Types
 Misc
 ====
     - Supports DNS Rebinding
-    - Supports Round round-robin
+    - Supports DNS round-robin
 
 
 Round-Robin
