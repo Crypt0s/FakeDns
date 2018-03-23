@@ -10,6 +10,8 @@ import SocketServer
 import signal
 import argparse
 import struct
+import random
+import ConfigParser
 
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
@@ -50,7 +52,7 @@ TYPE = {
     "\x00\x0c": "PTR",
     "\x00\x10": "TXT",
     "\x00\x0f": "MX",
-    "\x00\x06":"SOA"
+    "\x00\x06": "SOA"
 }
 
 # Stolen:
@@ -197,8 +199,8 @@ class DNSResponse(object):
                 self.rrauthority + self.rradditional + self.query + \
                 self.pointer + self.type + self.dnsclass + self.ttl + \
                 self.length + self.data
-        except (TypeError, ValueError):
-            pass
+        except Exception,e: #(TypeError, ValueError):
+            print "[!] - %s" % str(e)
 
 # All classes need to set type, length, and data fields of the DNS Response
 # Finished
@@ -268,13 +270,72 @@ class TXT(DNSResponse):
         # length field for this since it is already in the right spot
         self.length += chr(len(txt_record))
 
+
+class SOA(DNSResponse):
+    def __init__(self, query, config_location):
+        super(SOA, self).__init__(query)
+
+        # TODO: pre-read and cache all the config files for the rules for speed.
+        config = ConfigParser.ConfigParser()
+        config.read(config_location)
+
+        # handle cases where we want the serial to be random
+        serial = config.get(query.domain, "serial")
+        if serial.lower() == "random":
+            serial = int(random.getrandbits(32))
+        else:
+            # serial is still a str, cast to int.
+            serial = int(serial)
+
+        self.type = "\x00\x06"
+        self.mname = config.get(query.domain, "mname")       # name server that was original or primary source for this zone
+        self.rname = config.get(query.domain, "rname")       # domain name which specified mailbox of person responsible for zone
+        self.serial = serial                                 # 32-bit long version number of the zone copy
+        self.refresh = config.getint(query.domain, "refresh")# 32-bit time interval before zone refresh
+        self.retry = config.getint(query.domain, "retry")    # 32-bit time interval before retrying failed refresh
+        self.expire = config.getint(query.domain, "expire")  # 32-bit time interval after which the zone is not authoritative
+        self.minimum = config.getint(query.domain, "minimum")# The unsigned 32 bit minimum TTL for any RR from this zone.
+
+        # convert the config entries into DNS format. Convenient conversion function will be moved up to module later.
+        def convert(fqdn):
+            tmp = ""
+            for domain in fqdn.split('.'):
+                tmp += chr(len(domain)) + domain
+            tmp += "\xc0\x0c"
+            return tmp
+
+        self.data = ""
+
+        self.mname = convert(self.mname)
+        self.data += self.mname
+
+        self.rname = convert(self.rname)
+        self.data += self.rname
+
+        # pack the rest of the structure
+        self.data += struct.pack('>I', self.serial)
+        self.data += struct.pack('>I', self.refresh)
+        self.data += struct.pack('>I', self.retry)
+        self.data += struct.pack('>I', self.refresh)
+        self.data += struct.pack('>I', self.minimum)
+
+        # get length of the answers area
+        self.length = chr(len(self.data))
+
+        # length is always two bytes - add the extra blank byte if we're not large enough for two bytes.
+        if self.length < '\xff':
+            self.length = "\x00" + self.length
+
+
+
 # And this one is because Python doesn't have Case/Switch
 CASE = {
     "\x00\x01": A,
     "\x00\x1c": AAAA,
     "\x00\x05": CNAME,
     "\x00\x0c": PTR,
-    "\x00\x10": TXT
+    "\x00\x10": TXT,
+    "\x00\x06": SOA,
 }
 
 # Technically this is a subclass of A
