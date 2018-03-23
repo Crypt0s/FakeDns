@@ -7,3 +7,5 @@ A roundrobin 1.1.1.1 10%2.2.2.2,3.3.3.3,4.4.4.4
 # comment
 # A sample PTR entry, note the backwards IP here is required.
 PTR 1.0.0.127 localhost
+SOA example.com example.com.soa           # SOA rules have a special syntax: SOA [target domain] [config file path]
+                                          # see the example.com.soa file for an example and additional comments
