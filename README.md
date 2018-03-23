@@ -29,6 +29,7 @@ Supported Request Types
     - TXT
     - AAAA
     - PTR
+    - SOA
 
 In-Progress Request Types
 =========================
@@ -39,7 +40,6 @@ Misc
 ====
     - Supports DNS Rebinding
     - Supports round-robin
-
 
 Round-Robin
 ===========
