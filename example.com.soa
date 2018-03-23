@@ -1,0 +1,18 @@
+[example.com.] ; extra dot required at end.
+; example python ini file comment.
+mname=ns1     ; the domain name (.example.com) will be appended to this automatically
+rname=mx      ; the domain name (.example.com) will be appended to this automatically
+serial=random ; this can be random (for a random 32-bit integer) or an integer number
+refresh=60
+retry=60
+expire=60
+minimum=60
+
+;[ruledomain.tld.] ; the extra dot at the end IS REQUIRED
+;mname -- name server that was original or primary source for this zone
+;rname -- domain name which specified mailbox of person responsible for zone
+;serial-- 32-bit long version number of the zone copy
+;refresh- 32-bit time interval before zone refresh
+;retry -- 32-bit time interval before retrying failed refresh
+;expire-- 32-bit time interval after which the zone is not authoritative
+;minimum- The unsigned 32 bit minimum TTL for any RR from this zone.
