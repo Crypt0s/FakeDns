@@ -1,0 +1,5 @@
+version: '3'
+app:
+    build: 
+        image: FakeDns
+        dockerfile: testing/FakeDns_Dockerfile
