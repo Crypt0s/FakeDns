@@ -12,6 +12,7 @@ import argparse
 import struct
 import random
 import ConfigParser
+from fakedns import DNSQuery
 
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
@@ -26,7 +27,7 @@ class UDPHandler(SocketServer.BaseRequestHandler):
         (data, s) = self.request
         respond(data, self.client_address, s)
 
-
+"""
 class DNSQuery:
     def __init__(self, data):
         self.data = data
@@ -42,6 +43,7 @@ class DNSQuery:
             self.type = data[ini:][1:3]
         else:
             self.type = data[-4:-2]
+"""
 
 # Because python doesn't have native ENUM in 2.7:
 # https://en.wikipedia.org/wiki/List_of_DNS_record_types
@@ -589,7 +591,7 @@ class RuleEngine2:
 
 # Convenience method for threading.
 def respond(data, addr, s):
-    p = DNSQuery(data)
+    p = DNSQuery.parse(data)
     response = rules.match(p, addr[0])
     s.sendto(response, addr)
     return response
