@@ -3,7 +3,7 @@ import socket
 import multiprocessing
 from multiprocessing import Pool
 #from DNSQuery import DNSQuery
-from fakedns import DNSQuery
+from DNSQuery import DNSQuery
 
 def _resolve(packet):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
