@@ -1,0 +1,6 @@
+- type: parallel
+  name: lookup_example_1
+  steps:
+    - service: example_1
+      command: nslookup reddit.com
+
