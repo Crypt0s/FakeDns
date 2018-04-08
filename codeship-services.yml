@@ -2,4 +2,4 @@ app:
     build: 
         image: FakeDns
         context: .
-        dockerfile: testing/FakeDns_Dockerfile
+        dockerfile: ./testing/FakeDns_Dockerfile
