@@ -1,4 +1,4 @@
 app:
     build:
-        image: FakeDns
+        image: fakedns
         dockerfile: Dockerfile
