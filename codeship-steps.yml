@@ -2,5 +2,5 @@
   name: lookup_example_1
   steps:
     - service: app
-      command: nslookup reddit.com
+      command: nslookup reddit.com 127.0.0.1
 
