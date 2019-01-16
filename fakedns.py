@@ -235,11 +235,21 @@ class AAAA(DNSResponse):
         # just returns the first answer and only the address
         ip = result[0][4][0]
 
-# Not yet implemented
+# Implemented
 class CNAME(DNSResponse):
-    def __init__(self, query):
+    def __init__(self, query, domain):
         super(CNAME, self).__init__(query)
         self.type = "\x00\x05"
+
+        self.data = ""
+        for label in domain.split('.'):
+            self.data += chr(len(label)) + label
+        self.data += "\x00"
+
+        self.length = chr(len(self.data))
+        # Must be two bytes.
+        if self.length < '\xff':
+            self.length = "\x00" + self.length
 
 # Implemented
 class PTR(DNSResponse):
