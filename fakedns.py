@@ -280,6 +280,27 @@ class TXT(DNSResponse):
         # length field for this since it is already in the right spot
         self.length += chr(len(txt_record))
 
+# MX
+class MX(DNSResponse):
+    def __init__(self, query, txt_record):
+        super(MX, self).__init__(query)
+        self.type = "\x00\x0f"
+        self.data = "\x00\x01" + self.get_domain(txt_record) +"\x00"
+        self.length = chr(len(txt_record) + 4)
+        if self.length < '\xff':
+            self.length = "\x00" + self.length
+
+    @staticmethod
+    def get_domain(dns_record):
+       domain = dns_record
+       ret_domain=[]
+       for x in domain.split('.'):
+               st = "{:02x}".format(len(x))
+               ret_domain.append( st.decode("hex"))
+               ret_domain.append(x)
+       return "".join(ret_domain)
+
+
 
 class SOA(DNSResponse):
     def __init__(self, query, config_location):
@@ -345,6 +366,7 @@ CASE = {
     "\x00\x05": CNAME,
     "\x00\x0c": PTR,
     "\x00\x10": TXT,
+    "\x00\x0f": MX,
     "\x00\x06": SOA,
 }
 
