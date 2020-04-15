@@ -1,17 +1,25 @@
 #!/usr/bin/env python
 """Fakedns.py: A regular-expression based DNS MITM Server by Crypt0s."""
 
-import pdb
+# This isn't the most elegent way - i could possibly support both versions of python,
+# but people should really not use Python 2 anymore.
+import sys
+vnum = sys.version.split()[0]
+if int(vnum[0]) < 3:
+    print("Python 2 support has been deprecated.  Please run FakeDNS using Python3!")
+    sys.exit(1)
+
+import binascii
 import socket
 import re
 import sys
 import os
-import SocketServer
+import socketserver as SocketServer
 import signal
 import argparse
 import struct
 import random
-import ConfigParser
+import configparser as ConfigParser
 
 # inspired from DNSChef
 class ThreadedUDPServer(SocketServer.ThreadingMixIn, SocketServer.UDPServer):
@@ -30,15 +38,15 @@ class UDPHandler(SocketServer.BaseRequestHandler):
 class DNSQuery:
     def __init__(self, data):
         self.data = data
-        self.domain = ''
-        tipo = (ord(data[2]) >> 3) & 15  # Opcode bits
+        self.domain = b''
+        tipo = (data[2] >> 3) & 15  # Opcode bits
         if tipo == 0:  # Standard query
             ini = 12
-            lon = ord(data[ini])
+            lon = data[ini]
             while lon != 0:
-                self.domain += data[ini + 1:ini + lon + 1] + '.'
+                self.domain += data[ini + 1:ini + lon + 1] + b'.'
                 ini += lon + 1  # you can implement CNAME and PTR
-                lon = ord(data[ini])
+                lon = data[ini]
             self.type = data[ini:][1:3]
         else:
             self.type = data[-4:-2]
@@ -46,13 +54,13 @@ class DNSQuery:
 # Because python doesn't have native ENUM in 2.7:
 # https://en.wikipedia.org/wiki/List_of_DNS_record_types
 TYPE = {
-    "\x00\x01": "A",
-    "\x00\x1c": "AAAA",
-    "\x00\x05": "CNAME",
-    "\x00\x0c": "PTR",
-    "\x00\x10": "TXT",
-    "\x00\x0f": "MX",
-    "\x00\x06": "SOA"
+    b"\x00\x01": "A",
+    b"\x00\x1c": "AAAA",
+    b"\x00\x05": "CNAME",
+    b"\x00\x0c": "PTR",
+    b"\x00\x10": "TXT",
+    b"\x00\x0f": "MX",
+    b"\x00\x06": "SOA"
 }
 
 # Stolen:
@@ -98,7 +106,7 @@ def _explode_shorthand_ip_string(ip_str):
         sep = len(hextet[0].split(':')) + len(hextet[1].split(':'))
         new_ip = hextet[0].split(':')
 
-        for _ in xrange(fill_to - sep):
+        for _ in range(fill_to - sep):
             new_ip.append('0000')
         new_ip += hextet[1].split(':')
 
@@ -120,11 +128,11 @@ def _get_question_section(query):
     start_idx = 12
     end_idx = start_idx
 
-    num_questions = (ord(query.data[4]) << 8) | ord(query.data[5])
+    num_questions = (query.data[4] << 8) | query.data[5]
 
     while num_questions > 0:
-        while query.data[end_idx] != '\0':
-            end_idx += ord(query.data[end_idx]) + 1
+        while query.data[end_idx] != 0:
+            end_idx += query.data[end_idx] + 1
         # Include the null byte, type, and class
         end_idx += 5
         num_questions -= 1
@@ -177,18 +185,18 @@ class DNSResponse(object):
         self.flags = DNSFlag(aa=args.authoritative).pack()
         self.questions = query.data[4:6]  # Number of questions asked...
         # Answer RRs (Answer resource records contained in response) 1 for now.
-        self.rranswers = "\x00\x01"
-        self.rrauthority = "\x00\x00"  # Same but for authority
-        self.rradditional = "\x00\x00"  # Same but for additionals.
+        self.rranswers = b"\x00\x01"
+        self.rrauthority = b"\x00\x00"  # Same but for authority
+        self.rradditional = b"\x00\x00"  # Same but for additionals.
         # Include the question section
         self.query = _get_question_section(query)
         # The pointer to the resource record - seems to always be this value.
-        self.pointer = "\xc0\x0c"
+        self.pointer = b"\xc0\x0c"
         # This value is set by the subclass and is defined in TYPE dict.
         self.type = None
-        self.dnsclass = "\x00\x01"  # "IN" class.
+        self.dnsclass = b"\x00\x01"  # "IN" class.
         # TODO: Make this adjustable - 1 is good for noobs/testers
-        self.ttl = "\x00\x00\x00\x01"
+        self.ttl = b"\x00\x00\x00\x01"
         # Set by subclass because is variable except in A/AAAA records.
         self.length = None
         self.data = None  # Same as above.
@@ -199,17 +207,17 @@ class DNSResponse(object):
                 self.rrauthority + self.rradditional + self.query + \
                 self.pointer + self.type + self.dnsclass + self.ttl + \
                 self.length + self.data
-        except Exception,e: #(TypeError, ValueError):
-            print "[!] - %s" % str(e)
+        except Exception as e: #(TypeError, ValueError):
+            print("[!] - %s" % str(e))
 
 # All classes need to set type, length, and data fields of the DNS Response
 # Finished
 class A(DNSResponse):
     def __init__(self, query, record):
         super(A, self).__init__(query)
-        self.type = "\x00\x01"
-        self.length = "\x00\x04"
-        self.data = self.get_ip(record)
+        self.type = b"\x00\x01"
+        self.length = b"\x00\x04"
+        self.data = self.get_ip(record).encode()
 
     @staticmethod
     def get_ip(dns_record):
@@ -221,8 +229,8 @@ class A(DNSResponse):
 class AAAA(DNSResponse):
     def __init__(self, query, address):
         super(AAAA, self).__init__(query)
-        self.type = "\x00\x1c"
-        self.length = "\x00\x10"
+        self.type = b"\x00\x1c"
+        self.length = b"\x00\x10"
         # Address is already encoded properly for the response at rule-builder
         self.data = address
 
@@ -239,46 +247,49 @@ class AAAA(DNSResponse):
 class CNAME(DNSResponse):
     def __init__(self, query, domain):
         super(CNAME, self).__init__(query)
-        self.type = "\x00\x05"
+        self.type = b"\x00\x05"
 
-        self.data = ""
+        self.data = b""
         for label in domain.split('.'):
             self.data += chr(len(label)) + label
-        self.data += "\x00"
+        self.data += b"\x00"
 
         self.length = chr(len(self.data))
         # Must be two bytes.
-        if self.length < '\xff':
-            self.length = "\x00" + self.length
+        if self.length < "0xff":
+            self.length = b"\x00" + self.length.encode()
 
 # Implemented
 class PTR(DNSResponse):
     def __init__(self, query, ptr_entry):
         super(PTR, self).__init__(query)
-        self.type = "\x00\x0c"
-        self.ttl = "\x00\x00\x00\x00"
-        ptr_split = ptr_entry.split('.')
-        ptr_entry = "\x07".join(ptr_split)
+        if type(ptr_entry) != bytes:
+            ptr_entry = ptr_entry.encode()
 
-        self.data = "\x09" + ptr_entry + "\x00"
+        self.type = b"\x00\x0c"
+        self.ttl = b"\x00\x00\x00\x00"
+        ptr_split = ptr_entry.split(b'.')
+        ptr_entry = b"\x07".join(ptr_split)
+
+        self.data = b"\x09" + ptr_entry + b"\x00"
         self.length = chr(len(ptr_entry) + 2)
         # Again, must be 2-byte value.
-        if self.length < '\xff':
-            self.length = "\x00" + self.length
+        if self.length < "0xff":
+            self.length = b"\x00" + self.length.encode()
 
 # Finished
 class TXT(DNSResponse):
     def __init__(self, query, txt_record):
         super(TXT, self).__init__(query)
-        self.type = "\x00\x10"
-        self.data = txt_record
-        self.length = chr(len(txt_record) + 1)
-        # Must be two bytes.
-        if self.length < '\xff':
-            self.length = "\x00" + self.length
+        self.type = b"\x00\x10"
+        self.data = txt_record.encode()
+        self.length = chr(len(txt_record) + 1).encode()
+        # Must be two bytes.  This is the better, more python-3 way to calculate length.  Swap to this later.
+        if len(self.length) < 2:
+            self.length = b"\x00" + self.length 
         # Then, we have to add the TXT record length field!  We utilize the
         # length field for this since it is already in the right spot
-        self.length += chr(len(txt_record))
+        self.length += chr(len(txt_record)).encode()
 
 
 class SOA(DNSResponse):
@@ -286,41 +297,41 @@ class SOA(DNSResponse):
         super(SOA, self).__init__(query)
 
         # TODO: pre-read and cache all the config files for the rules for speed.
-        config = ConfigParser.ConfigParser()
+        config = ConfigParser.ConfigParser(inline_comment_prefixes=";")
         config.read(config_location)
 
         # handle cases where we want the serial to be random
-        serial = config.get(query.domain, "serial")
+        serial = config.get(query.domain.decode(), "serial")
         if serial.lower() == "random":
             serial = int(random.getrandbits(32))
         else:
             # serial is still a str, cast to int.
             serial = int(serial)
 
-        self.type = "\x00\x06"
-        self.mname = config.get(query.domain, "mname")       # name server that was original or primary source for this zone
-        self.rname = config.get(query.domain, "rname")       # domain name which specified mailbox of person responsible for zone
+        self.type = b"\x00\x06"
+        self.mname = config.get(query.domain.decode(), "mname")       # name server that was original or primary source for this zone
+        self.rname = config.get(query.domain.decode(), "rname")       # domain name which specified mailbox of person responsible for zone
         self.serial = serial                                 # 32-bit long version number of the zone copy
-        self.refresh = config.getint(query.domain, "refresh")# 32-bit time interval before zone refresh
-        self.retry = config.getint(query.domain, "retry")    # 32-bit time interval before retrying failed refresh
-        self.expire = config.getint(query.domain, "expire")  # 32-bit time interval after which the zone is not authoritative
-        self.minimum = config.getint(query.domain, "minimum")# The unsigned 32 bit minimum TTL for any RR from this zone.
+        self.refresh = config.getint(query.domain.decode(), "refresh")# 32-bit time interval before zone refresh
+        self.retry = config.getint(query.domain.decode(), "retry")    # 32-bit time interval before retrying failed refresh
+        self.expire = config.getint(query.domain.decode(), "expire")  # 32-bit time interval after which the zone is not authoritative
+        self.minimum = config.getint(query.domain.decode(), "minimum")# The unsigned 32 bit minimum TTL for any RR from this zone.
 
         # convert the config entries into DNS format. Convenient conversion function will be moved up to module later.
         def convert(fqdn):
-            tmp = ""
+            tmp = b""
             for domain in fqdn.split('.'):
-                tmp += chr(len(domain)) + domain
-            tmp += "\xc0\x0c"
+                tmp += chr(len(domain)).encode() + domain.encode()
+            tmp += b"\xc0\x0c"
             return tmp
 
-        self.data = ""
+        self.data = b""
 
         self.mname = convert(self.mname)
         self.data += self.mname
 
         self.rname = convert(self.rname)
-        self.data += self.rname
+        self.data += self.rname # already is a bytes object.
 
         # pack the rest of the structure
         self.data += struct.pack('>I', self.serial)
@@ -333,19 +344,19 @@ class SOA(DNSResponse):
         self.length = chr(len(self.data))
 
         # length is always two bytes - add the extra blank byte if we're not large enough for two bytes.
-        if self.length < '\xff':
-            self.length = "\x00" + self.length
+        if self.length < "0xff":
+            self.length = b"\x00" + self.length.encode()
 
 
 
 # And this one is because Python doesn't have Case/Switch
 CASE = {
-    "\x00\x01": A,
-    "\x00\x1c": AAAA,
-    "\x00\x05": CNAME,
-    "\x00\x0c": PTR,
-    "\x00\x10": TXT,
-    "\x00\x06": SOA,
+    b"\x00\x01": A,
+    b"\x00\x1c": AAAA,
+    b"\x00\x05": CNAME,
+    b"\x00\x0c": PTR,
+    b"\x00\x10": TXT,
+    b"\x00\x06": SOA,
 }
 
 # Technically this is a subclass of A
@@ -353,11 +364,11 @@ class NONEFOUND(DNSResponse):
     def __init__(self, query):
         super(NONEFOUND, self).__init__(query)
         self.type = query.type
-        self.flags = "\x81\x83"
-        self.rranswers = "\x00\x00"
-        self.length = "\x00\x00"
-        self.data = "\x00"
-        print ">> Built NONEFOUND response"
+        self.flags = b"\x81\x83"
+        self.rranswers = b"\x00\x00"
+        self.length = b"\x00\x00"
+        self.data = b"\x00"
+        print(">> Built NONEFOUND response")
 
 
 class Rule (object):
@@ -393,7 +404,6 @@ class Rule (object):
 
     def match(self, req_type, domain, addr):
         # assert that the query type and domain match
-
         try:
             req_type = TYPE[req_type]
         except KeyError:
@@ -405,17 +415,17 @@ class Rule (object):
             return None
 
         try:
-            assert self.domain.match(domain)
+            assert self.domain.match(domain.decode())
         except AssertionError:
             return None
 
         # Check to see if we have a rebind rule and if we do, return that addr first
         if self.rebinds:
-            if self.match_history.has_key(addr):
+            if self.match_history.get(addr) is not None:
 
                 # passed the threshold - start doing a rebind
                 if self.match_history[addr] >= self.rebind_threshold:
-                    return self.rebinds.next()
+                    return next(self.rebinds)
 
                 # plus one
                 else:
@@ -427,23 +437,23 @@ class Rule (object):
 
         # We didn't trip on any rebind rules (or didnt have any)
         # but we're returning a rule-based entry based on the match
-        return self.ips.next()
+        return next(self.ips)
 
 
 # Error classes for handling rule issues
 class RuleError_BadRegularExpression(Exception):
     def __init__(self,lineno):
-        print "\n!! Malformed Regular Expression on rulefile line #%d\n\n" % lineno
+        print("\n!! Malformed Regular Expression on rulefile line #%d\n\n" % lineno)
 
 
 class RuleError_BadRuleType(Exception):
     def __init__(self,lineno):
-        print "\n!! Rule type unsupported on rulefile line #%d\n\n" % lineno
+        print("\n!! Rule type unsupported on rulefile line #%d\n\n" % lineno)
 
 
 class RuleError_BadFormat(Exception):
     def __init__(self,lineno):
-        print "\n!! Not Enough Parameters for rule on rulefile line #%d\n\n" % lineno
+        print("\n!! Not Enough Parameters for rule on rulefile line #%d\n\n" % lineno)
 
 
 class RuleEngine2:
@@ -456,8 +466,8 @@ class RuleEngine2:
                 try:
                     self_ip = socket.gethostbyname(socket.gethostname())
                 except socket.error:
-                    print ">> Could not get your IP address from your " \
-                          "DNS Server."
+                    print(">> Could not get your IP address from your " \
+                          "DNS Server.")
                     self_ip = '127.0.0.1'
                 ips[ips.index(ip)] = self_ip
         return ips
@@ -535,8 +545,7 @@ class RuleEngine2:
                             continue
                         if _is_shorthand_ip(ip):
                             ip = _explode_shorthand_ip_string(ip)
-
-                        ip = ip.replace(":", "").decode('hex')
+                        ip = binascii.unhexlify(ip.replace(":", "")) #.decode('hex')
                         tmp_ip_array.append(ip)
                     ips = tmp_ip_array
 
@@ -547,7 +556,7 @@ class RuleEngine2:
                 # increment the line number
                 lineno += 1
 
-            print ">> Parsed %d rules from %s" % (len(self.rule_list),file_)
+            print(">> Parsed %d rules from %s" % (len(self.rule_list),file_))
 
 
     def match(self, query, addr):
@@ -570,7 +579,7 @@ class RuleEngine2:
 
                 response = CASE[query.type](query, response_data)
 
-                print ">> Matched Request - " + query.domain
+                print(">> Matched Request - " + query.domain.decode())
                 return response.make_packet()
 
         # if we got here, we didn't match.
@@ -578,7 +587,7 @@ class RuleEngine2:
 
         # if the user said not to forward requests, and we are here, it's time to send a NONEFOUND
         if args.noforward:
-            print ">> Don't Forward %s" % query.domain
+            print(">> Don't Forward %s" % query.domain.decode())
             return NONEFOUND(query).make_packet()
         try:
             s = socket.socket(type=socket.SOCK_DGRAM)
@@ -587,13 +596,13 @@ class RuleEngine2:
             s.sendto(query.data, addr)
             data = s.recv(1024)
             s.close()
-            print "Unmatched Request " + query.domain
+            print("Unmatched Request " + query.domain.decode())
             return data
-        except socket.error, e:
+        except socket.error as e:
             # We shouldn't wind up here but if we do, don't drop the request
             # send the client *something*
-            print ">> Error was handled by sending NONEFOUND"
-            print e
+            print(">> Error was handled by sending NONEFOUND")
+            print(e)
             return NONEFOUND(query).make_packet()
 
 
@@ -606,7 +615,7 @@ def respond(data, addr, s):
 
 # Capture Control-C and handle here
 def signal_handler(signal, frame):
-    print 'Exiting...'
+    print('Exiting...')
     sys.exit(0)
 
 
@@ -650,8 +659,8 @@ if __name__ == '__main__':
     # Default config file path.
     path = args.path
     if not os.path.isfile(path):
-        print '>> Please create a "dns.conf" file or specify a config path: ' \
-              './fakedns.py [configfile]'
+        print('>> Please create a "dns.conf" file or specify a config path: ' \
+              './fakedns.py [configfile]')
         exit()
 
     rules = RuleEngine2(path)
@@ -663,7 +672,7 @@ if __name__ == '__main__':
     try:
         server = ThreadedUDPServer((interface, int(port)), UDPHandler)
     except socket.error:
-        print ">> Could not start server -- is another program on udp:{0}?".format(port)
+        print(">> Could not start server -- is another program on udp:{0}?".format(port))
         exit(1)
 
     server.daemon = True
