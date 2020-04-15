@@ -251,13 +251,13 @@ class CNAME(DNSResponse):
 
         self.data = b""
         for label in domain.split('.'):
-            self.data += chr(len(label)) + label
+            self.data += chr(len(label)).encode() + label.encode()
         self.data += b"\x00"
 
-        self.length = chr(len(self.data))
+        self.length = chr(len(self.data)).encode()
         # Must be two bytes.
-        if self.length < "0xff":
-            self.length = b"\x00" + self.length.encode()
+        if len(self.length) < 2:
+            self.length = b"\x00" + self.length
 
 # Implemented
 class PTR(DNSResponse):
@@ -291,6 +291,25 @@ class TXT(DNSResponse):
         # length field for this since it is already in the right spot
         self.length += chr(len(txt_record)).encode()
 
+
+class MX(DNSResponse):
+    def __init__(self, query, txt_record):
+        super(MX, self).__init__(query)
+        self.type = b"\x00\x0f"
+        self.data = b"\x00\x01" + self.get_domain(txt_record) + b"\x00"
+        self.length = chr(len(txt_record) + 4)
+        if self.length < '\xff':
+            self.length = "\x00" + self.length
+
+    @staticmethod
+    def get_domain(dns_record):
+       domain = dns_record
+       ret_domain=[]
+       for x in domain.split('.'):
+               st = "{:02x}".format(len(x))
+               ret_domain.append( st.decode("hex"))
+               ret_domain.append(x)
+       return "".join(ret_domain)
 
 class SOA(DNSResponse):
     def __init__(self, query, config_location):
@@ -356,6 +375,7 @@ CASE = {
     b"\x00\x05": CNAME,
     b"\x00\x0c": PTR,
     b"\x00\x10": TXT,
+    b"\x00\x0f": MX,
     b"\x00\x06": SOA,
 }
 
