@@ -1,5 +1,7 @@
 FakeDns
 =======
+Update 4/14/2020 - Python 2 support removed and code swapped to Python3
+
 Now with round-robin & improved options!
 
 Bugs:
