@@ -286,7 +286,7 @@ class TXT(DNSResponse):
         self.length = chr(len(txt_record) + 1).encode()
         # Must be two bytes.  This is the better, more python-3 way to calculate length.  Swap to this later.
         if len(self.length) < 2:
-            self.length = b"\x00" + self.length 
+            self.length = b"\x00" + self.length
         # Then, we have to add the TXT record length field!  We utilize the
         # length field for this since it is already in the right spot
         self.length += chr(len(txt_record)).encode()
@@ -599,7 +599,7 @@ class RuleEngine2:
 
                 response = CASE[query.type](query, response_data)
 
-                print(">> Matched Request - " + query.domain.decode())
+                print(f'>> Matched Request - {query.domain.decode()} ({TYPE[query.type]})')
                 return response.make_packet()
 
         # if we got here, we didn't match.
@@ -616,7 +616,7 @@ class RuleEngine2:
             s.sendto(query.data, addr)
             data = s.recv(1024)
             s.close()
-            print("Unmatched Request " + query.domain.decode())
+            print(f'Unmatched Request {query.domain.decode()} ({TYPE[query.type]})')
             return data
         except socket.error as e:
             # We shouldn't wind up here but if we do, don't drop the request
