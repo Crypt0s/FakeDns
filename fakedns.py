@@ -223,7 +223,7 @@ class A(DNSResponse):
     def get_ip(dns_record):
         ip = dns_record
         # Convert to hex
-        return ''.join(chr(int(x)) for x in ip.split('.'))
+        return bytes(map(int, ip.split('.')))
 
 # Implemented
 class AAAA(DNSResponse):
