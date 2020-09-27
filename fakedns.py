@@ -519,7 +519,6 @@ class RuleEngine2:
                 # remove any hashmarks (comments) at the end of a rule
                 if "#" in rule:
                     rule = rule.split("#", 1)[0]
-                    print(rule)
 
                 # Confirm that the rule has at least three columns to it
                 if len(rule.split()) < 3:
