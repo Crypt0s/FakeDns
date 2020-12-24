@@ -78,16 +78,6 @@ I have had a lot of success testing/developing FakeDNS in Docker because it's ea
 
 If you want to try it out, you can do so without much heavy lifting by following these steps:
 
-Assuming you are **_inside the FakeDns directory_**:
+Assuming you are **_inside the FakeDns directory_**: `sudo docker run --interactive --tty --volume \`pwd\`:/opt/FakeDns -p 5353:53/udp python:3.8 /opt/FakeDns/fakedns.py -c /opt/FakeDns/dns.conf.example`. And to test you can run `nslookup -port=5353 testrule.test 127.0.0.1` which should return `1.1.1.1` on your first request
 
-    sudo docker pull ubuntu
-    sudo docker run -it -v `pwd`:/opt -P --privileged --expose 53 ubuntu:latest /bin/bash
-    
-You'll then be at a docker root bash prompt which you can use to install python2.7 and run FakeDns:
-
-    apt-get update && apt-get install -y python
-    cd /opt
-    python fakedns.py -c dns.conf.example
-
-If you're new to docker and you don't have any other docker containers running, you'll probably have an IP of 172.17.0.2 for your now-running container, which you can hit using nslookup.
-From there you'll be able to figure it out.  If there's enough interest I will make a script for this or a docker image which will be pushed to the docker community hub.
+Or, if you'd like to use docker-compose, simply run `docker-compose up` and use the same test as above.
