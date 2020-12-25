@@ -7,4 +7,10 @@ services:
     volumes:
       - ./:/opt/FakeDns
     ports: 
-      - "5353:53/udp"
+      - "53:53/udp"
+  FakeDns-test:
+    container_name: FakeDns-test
+    image: fakedns-test:latest
+    build: ./tests
+    depends_on: 
+      - FakeDns
