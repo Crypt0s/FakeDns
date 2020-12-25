@@ -3,6 +3,7 @@ services:
   FakeDns:
     container_name: FakeDns
     image: python:3.8
+    working_dir: /opt/FakeDns/
     command: /opt/FakeDns/fakedns.py -c /opt/FakeDns/dns.conf.example
     volumes:
       - ./:/opt/FakeDns
