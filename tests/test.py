@@ -96,7 +96,9 @@ class TestRecordTypes(DNSTestCase):
         """Tests SOA Record
         """
         dns_response = self._dns_lookup("example.com", "SOA")
-        self.assertEqual(dns_response, "ns.icann.org. noc.dns.icann.org. 2020121101 7200 3600 1209600 3600")
+        self.assertTrue(
+            dns_response.startswith("ns1.example.com. mx.example.com. ") and dns_response.endswith(" 60 60 60 60")
+        )
 
 
 class TestFeatures(DNSTestCase):
