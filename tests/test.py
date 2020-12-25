@@ -6,11 +6,11 @@
 """Imported Libraries
 
 unittest - Unit Testing Python Framework
-subprocess - Launch the FakeDns process
+socket - Do one cheap DNS Lookup variant 
 dns - DNS Query library
 """
 import unittest
-import subprocess
+import socket
 import dns.resolver
 
 
@@ -50,9 +50,7 @@ class DNSTestCase(unittest.TestCase):
         """
         # Determine FakeDns IP address to use that as the name server
         self.resolver = dns.resolver.Resolver()
-        self.resolver.nameservers = ['127.0.0.1']
-
-    
+        self.resolver.nameservers = [socket.gethostbyname('FakeDns')] # Can't lookup 'FakeDns' via dns.resolver
 
 
 class TestRecordTypes(DNSTestCase):
@@ -98,7 +96,6 @@ class TestRecordTypes(DNSTestCase):
         """Tests SOA Record
         """
         dns_response = self._dns_lookup("example.com", "SOA")
-        print("SOA!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!",dns_response)
         self.assertEqual(dns_response, "ns.icann.org. noc.dns.icann.org. 2020121101 7200 3600 1209600 3600")
 
 
