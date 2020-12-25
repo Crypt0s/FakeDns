@@ -47,7 +47,7 @@ class DNSTestCase(unittest.TestCase):
 
     def setUp(self):
         """Creates the FakeDns Process
-        """
+        """ 
         # Determine FakeDns IP address to use that as the name server
         self.resolver = dns.resolver.Resolver()
         self.resolver.nameservers = [socket.gethostbyname('FakeDns')] # Can't lookup 'FakeDns' via dns.resolver
@@ -116,7 +116,6 @@ class TestFeatures(DNSTestCase):
     def test_RoundRobin(self):
         """Test DNS roundrobin
         """
-        # We do two rounds because we want to make sure the "wrapping around" feature doesn't break
         answers = [self._dns_lookup("roundrobin", "A") for _ in range(13)]
         expected_answers = ["1.1.1.1"] * 10 + ["2.2.2.2", "3.3.3.3", "4.4.4.4"]
         self.assertEqual(answers, expected_answers)
