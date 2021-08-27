@@ -511,10 +511,14 @@ class RuleEngine2:
 
             for rule in rules:
 
-                # ignore blank lines or lines starting with hashmark (coments)
+                # ignore blank lines or lines starting with hashmark (comments)
                 if len(rule.strip()) == 0 or rule.lstrip()[0] == "#" or rule == '\n':
                     # thank you to github user cambid for the comments suggestion
                     continue
+                
+                # remove any hashmarks (comments) at the end of a rule
+                if "#" in rule:
+                    rule = rule.split("#", 1)[0]
 
                 # Confirm that the rule has at least three columns to it
                 if len(rule.split()) < 3:
@@ -692,7 +696,10 @@ if __name__ == '__main__':
     try:
         server = ThreadedUDPServer((interface, int(port)), UDPHandler)
     except socket.error:
-        print(">> Could not start server -- is another program on udp:{0}?".format(port))
+        if os.geteuid() != 0 and int(port) < 1024:
+            print("Root privileges may be required to run on udp:{0}".format(port));
+        else:
+            print(">> Could not start server -- is another program on udp:{0}?".format(port))
         exit(1)
 
     server.daemon = True
