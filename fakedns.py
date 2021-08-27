@@ -217,13 +217,13 @@ class A(DNSResponse):
         super(A, self).__init__(query)
         self.type = b"\x00\x01"
         self.length = b"\x00\x04"
-        self.data = self.get_ip(record).encode()
+        self.data = self.get_ip(record)
 
     @staticmethod
     def get_ip(dns_record):
         ip = dns_record
         # Convert to hex
-        return ''.join(chr(int(x)) for x in ip.split('.'))
+        return b''.join(int(x).to_bytes(1, 'little') for x in ip.split('.'))
 
 # Implemented
 class AAAA(DNSResponse):

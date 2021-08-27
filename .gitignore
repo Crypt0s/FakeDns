@@ -1,1 +1,2 @@
-dns.conf
+venv/
+__pycache__/
